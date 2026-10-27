@@ -1,0 +1,3 @@
+package com.franco.desco.application.catalog;
+import com.franco.desco.application.shared.pagination.PageRequest;
+public final class CatalogCommands{private CatalogCommands(){} public record Filter(String catalogo){} public record ListCatalog(PageRequest<Filter> page){} public record CreateCatalog(String catalogo,String codigo,String nombre,String descripcion,String categoria){} public record UpdateCatalog(String catalogo,Long id,String nombre,String descripcion,String categoria){} public record DisableCatalog(String catalogo,Long id,String motivo){} public record ListDepartments(){} public record ListProvinces(String departamentoCodigo){} public record ListDistricts(String provinciaCodigo){} public record ListPopulationCenters(String distritoCodigo){} }

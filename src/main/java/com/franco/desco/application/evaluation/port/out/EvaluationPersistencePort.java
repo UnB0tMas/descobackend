@@ -1,0 +1,16 @@
+package com.franco.desco.application.evaluation.port.out;
+
+import com.franco.desco.application.evaluation.*;
+import com.franco.desco.application.evaluation.EvaluationCommands.*;
+import com.franco.desco.application.shared.*;
+import com.franco.desco.application.shared.pagination.PageResult;
+import com.franco.desco.domain.evaluation.*;
+import java.util.*;
+
+public interface EvaluationPersistencePort {
+    PersistenceResult<PageResult<EvaluationModels.Summary>> list(EvaluationCommands.ListEvaluations c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<EvaluationModels.Detail> get(EvaluationCommands.Get c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Long> create(EvaluationCommands.Create c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Void> update(EvaluationCommands.Update c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Void> registerDryMatter(EvaluationCommands.RegisterDryMatter c,SessionIdentity i,RequestMetadata m);
+}

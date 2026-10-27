@@ -1,0 +1,17 @@
+package com.franco.desco.application.visit.port.out;
+
+import com.franco.desco.application.visit.*;
+import com.franco.desco.application.visit.VisitCommands.*;
+import com.franco.desco.application.shared.*;
+import com.franco.desco.application.shared.pagination.PageResult;
+import com.franco.desco.domain.visit.*;
+import java.util.*;
+
+public interface VisitPersistencePort {
+    PersistenceResult<PageResult<VisitModels.Summary>> list(VisitCommands.ListVisits c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<VisitModels.Detail> get(VisitCommands.Get c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Long> start(VisitCommands.Start c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Void> update(VisitCommands.Update c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Void> finish(VisitCommands.Finish c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Void> annul(VisitCommands.Annul c,SessionIdentity i,RequestMetadata m);
+}

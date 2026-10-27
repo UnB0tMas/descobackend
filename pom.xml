@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="
+            http://maven.apache.org/POM/4.0.0
+            https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- ========================================================= -->
+    <!-- SPRING BOOT                                               -->
+    <!-- ========================================================= -->
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/>
+    </parent>
+
+    <!-- ========================================================= -->
+    <!-- PROYECTO                                                   -->
+    <!-- ========================================================= -->
+
+    <groupId>com.franco</groupId>
+    <artifactId>desco</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <name>desco</name>
+
+    <description>
+        Sistema integral DESCO UOT Sara Sara
+    </description>
+
+    <!-- ========================================================= -->
+    <!-- PROPIEDADES                                                -->
+    <!-- ========================================================= -->
+
+    <properties>
+
+        <!-- Java -->
+        <java.version>21</java.version>
+
+        <!-- Codificación -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- Swagger / OpenAPI -->
+        <springdoc.version>3.1.0</springdoc.version>
+
+        <!-- Argon2 / Bouncy Castle -->
+        <bouncycastle.version>1.85.2</bouncycastle.version>
+
+    </properties>
+
+    <!-- ========================================================= -->
+    <!-- DEPENDENCIAS                                               -->
+    <!-- ========================================================= -->
+
+    <dependencies>
+
+        <!-- ===================================================== -->
+        <!-- WEB / API REST                                       -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- VALIDACIÓN                                           -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- SEGURIDAD                                            -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- JWT / OAUTH2 RESOURCE SERVER                         -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>
+                spring-boot-starter-security-oauth2-resource-server
+            </artifactId>
+        </dependency>
+
+
+        <!--
+            Necesario de forma explícita porque generaremos
+            y validaremos nuestros propios JWT.
+
+            Proporciona:
+            - JwtEncoder
+            - JwtDecoder
+            - NimbusJwtEncoder
+            - NimbusJwtDecoder
+            - JwtClaimsSet
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- ARGON2                                               -->
+        <!-- ===================================================== -->
+
+        <!--
+            Spring Security proporciona Argon2PasswordEncoder.
+
+            La implementación clásica de Spring Security
+            requiere Bouncy Castle.
+        -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- BASE DE DATOS                                        -->
+        <!-- ===================================================== -->
+
+        <!--
+            IMPORTANTE:
+
+            No utilizaremos JPA/Hibernate como acceso principal.
+
+            La base DESCO ya posee procedimientos almacenados
+            responsables de:
+            - reglas de negocio
+            - permisos
+            - auditoría
+            - idempotencia
+            - estados
+            - transiciones
+            - paginación
+
+            Se accederá mediante JdbcTemplate / SimpleJdbcCall.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- FLYWAY ACTIVO - MIGRACIONES SQL SERVER                                 -->
+        <!-- ===================================================== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-sqlserver</artifactId>
+        </dependency>
+
+        <!-- ===================================================== -->
+        <!-- SQL SERVER                                           -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>com.microsoft.sqlserver</groupId>
+            <artifactId>mssql-jdbc</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- CORREO ELECTRÓNICO                                   -->
+        <!-- ===================================================== -->
+
+        <!--
+            Se utilizará para:
+            - validación de cuenta
+            - código 2FA
+            - recuperación de contraseña
+            - nuevo dispositivo
+            - cambio de contraseña
+            - cambio de correo
+            - alertas de seguridad
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- SWAGGER / OPENAPI                                    -->
+        <!-- ===================================================== -->
+
+        <!--
+            Genera automáticamente:
+
+            /v3/api-docs
+            /v3/api-docs.yaml
+            /swagger-ui/index.html
+
+            El frontend Angular podrá consumir /v3/api-docs
+            para generar:
+            - models
+            - services
+            - APIs
+            - DTOs TypeScript
+        -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- ACTUATOR                                             -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- LOMBOK                                               -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- CONFIGURATION PROCESSOR                              -->
+        <!-- ===================================================== -->
+
+        <!--
+            Permite trabajar correctamente con:
+
+            @ConfigurationProperties
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- TESTING - WEB MVC                                    -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- TESTING - VALIDATION                                 -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- TESTING - SECURITY                                   -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- TESTING - JWT / RESOURCE SERVER                      -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>
+                spring-boot-starter-security-oauth2-resource-server-test
+            </artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- TESTING - JDBC                                       -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- TESTING - MAIL                                       -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- TESTING - ACTUATOR                                   -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- TESTCONTAINERS + SPRING BOOT                         -->
+        <!-- ===================================================== -->
+
+        <!--
+            Integración oficial de Spring Boot con Testcontainers.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- TESTCONTAINERS - JUNIT 5                             -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- ===================================================== -->
+        <!-- TESTCONTAINERS - SQL SERVER                          -->
+        <!-- ===================================================== -->
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-mssqlserver</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+
+    <!-- ========================================================= -->
+    <!-- BUILD                                                     -->
+    <!-- ========================================================= -->
+
+    <build>
+
+        <plugins>
+
+            <!-- ================================================= -->
+            <!-- SPRING BOOT                                      -->
+            <!-- ================================================= -->
+
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+
+                <configuration>
+
+                    <!--
+                        Lombok no debe incluirse dentro
+                        del JAR final.
+                    -->
+                    <excludes>
+
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+
+                    </excludes>
+
+                </configuration>
+
+            </plugin>
+
+
+            <!-- ================================================= -->
+            <!-- COMPILADOR JAVA                                  -->
+            <!-- ================================================= -->
+
+            <plugin>
+
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+
+                <configuration>
+
+                    <!-- Java 21 -->
+                    <release>${java.version}</release>
+
+                    <!--
+                        Recomendado por SpringDoc para conservar
+                        nombres de parámetros dentro de OpenAPI.
+                    -->
+                    <parameters>true</parameters>
+
+                    <annotationProcessorPaths>
+
+                        <!-- Lombok -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+
+                        <!-- Configuration Properties -->
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>
+                                spring-boot-configuration-processor
+                            </artifactId>
+                        </path>
+
+                    </annotationProcessorPaths>
+
+                </configuration>
+
+            </plugin>
+
+        </plugins>
+
+    </build>
+
+</project>

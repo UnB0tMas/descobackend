@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="es"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
+
+    <title th:text="${title}">DESCO</title>
+
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            background-color: #f2f4f7;
+        }
+
+        body, table, td, a, p, div, span, h1 {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        table {
+            border-collapse: collapse;
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
+
+        img {
+            border: 0;
+            display: block;
+            outline: none;
+            text-decoration: none;
+        }
+
+        a {
+            text-decoration: none;
+        }
+
+        .preheader {
+            display: none !important;
+            visibility: hidden;
+            opacity: 0;
+            height: 0;
+            max-height: 0;
+            width: 0;
+            max-width: 0;
+            overflow: hidden;
+            mso-hide: all;
+        }
+
+        @media only screen and (max-width: 620px) {
+            .outer-pad { padding: 24px 12px !important; }
+            .container { width: 100% !important; max-width: 100% !important; }
+            .card { border-radius: 10px !important; }
+            .px { padding-left: 24px !important; padding-right: 24px !important; }
+            .header-pad { padding: 22px 24px !important; }
+            .footer-pad { padding: 26px 24px !important; }
+            .title { font-size: 21px !important; line-height: 28px !important; }
+            .code { font-size: 30px !important; letter-spacing: 5px !important; }
+            .btn { display: block !important; width: 100% !important; box-sizing: border-box; text-align: center !important; }
+            .logo-cell, .badge-cell { display: block !important; width: 100% !important; text-align: left !important; }
+            .badge-cell { padding-top: 12px !important; text-align: left !important; }
+        }
+
+        @media only screen and (max-width: 400px) {
+            .code { font-size: 25px !important; letter-spacing: 3px !important; }
+        }
+    </style>
+</head>
+
+<body style="margin:0; padding:0; background-color:#f2f4f7;">
+
+<div class="preheader" th:text="${preheader}">Código de verificación</div>
+
+<!-- Wrapper -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f2f4f7;">
+    <tr>
+        <td align="center" class="outer-pad" style="padding:48px 16px;">
+
+            <!-- Container -->
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="container" style="width:100%; max-width:600px;">
+
+                <!-- Logo / marca (fuera de la card) -->
+                <tr>
+                    <td align="center" style="padding-bottom:24px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td valign="middle" style="padding-right:9px;">
+                                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="26" height="26" style="width:26px; height:26px; background-color:#1a3a5c; border-radius:7px;">
+                                        <tr>
+                                            <td align="center" valign="middle" style="color:#ffffff; font-size:13px; font-weight:700; font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;" th:text="${#strings.substring(companyName,0,1)}">D</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td valign="middle">
+                                    <span style="color:#5c6b78; font-size:13px; font-weight:600; letter-spacing:0.2px;" th:text="${companyName}">DESCO</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- Card -->
+                <tr>
+                    <td class="card" style="background-color:#ffffff; border:1px solid #e3e8ed; border-radius:14px; overflow:hidden;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+                            <!-- Header -->
+                            <tr>
+                                <td class="header-pad" style="padding:26px 40px; border-bottom:1px solid #edf0f3;">
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td class="logo-cell" valign="middle">
+                                                <span style="color:#101828; font-size:15px; font-weight:700; letter-spacing:-0.1px;" th:text="${companyName}">DESCO</span>
+                                            </td>
+                                            <td class="badge-cell" align="right" valign="middle" style="text-align:right;">
+                                                <span style="display:inline-block; padding:5px 10px; background-color:#f0f4f8; border-radius:100px; font-size:11px; font-weight:600; color:#475467;" th:text="${unitName}">UOT Sara Sara</span>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+
+                            <!-- Contenido -->
+                            <tr>
+                                <td class="px" style="padding:36px 40px 8px;">
+
+                                    <div style="margin:0 0 12px; font-size:11px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; color:#7f8c98;" th:text="${category}">SEGURIDAD</div>
+
+                                    <h1 class="title" style="margin:0 0 16px; color:#101828; font-size:24px; line-height:31px; font-weight:700; letter-spacing:-0.3px;" th:text="${title}">Verifica tu cuenta</h1>
+
+                                    <p th:if="${recipientName != null and !#strings.isEmpty(recipientName)}"
+                                       style="margin:0 0 12px; color:#344054; font-size:15px; line-height:23px;">
+                                        Hola <strong th:text="${recipientName}">usuario</strong>,
+                                    </p>
+
+                                    <p style="margin:0 0 4px; color:#344054; font-size:15px; line-height:24px;" th:text="${intro}">
+                                        Usa el siguiente código para continuar.
+                                    </p>
+
+                                </td>
+                            </tr>
+
+                            <!-- Código -->
+                            <tr th:if="${code != null and !#strings.isEmpty(code)}">
+                                <td class="px" style="padding:20px 40px 4px;">
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc; border:1px solid #e3e8ed; border-radius:10px;">
+                                        <tr>
+                                            <td align="center" style="padding:22px 20px 20px;">
+                                                <div style="color:#7f8c98; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;" th:text="${codeLabel}">Código de verificación</div>
+                                                <div class="code" style="color:#101828; font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:34px; line-height:40px; font-weight:700; letter-spacing:7px;" th:text="${code}">123456</div>
+                                                <div style="margin-top:10px; color:#98a2b3; font-size:11px; line-height:16px;">
+                                                    <span th:if="${expiryMinutes != null}">
+                                                        Válido por <span th:text="${expiryMinutes}">10</span> minutos · uso único
+                                                    </span>
+                                                    <span th:unless="${expiryMinutes != null}">Uso único · no lo compartas</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+
+                            <!-- Botón -->
+                            <tr th:if="${actionUrl != null and !#strings.isEmpty(actionUrl)}">
+                                <td class="px" align="center" style="padding:22px 40px 6px;">
+                                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                                        <tr>
+                                            <td align="center" bgcolor="#1a3a5c" style="background-color:#1a3a5c; border-radius:8px;">
+                                                <a th:href="${actionUrl}" th:text="${actionLabel}" class="btn"
+                                                   style="display:inline-block; padding:13px 28px; color:#ffffff; font-size:14px; font-weight:600; text-align:center; border-radius:8px;">
+                                                    Continuar
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+
+                            <!-- Aviso -->
+                            <tr th:if="${warningTitle != null or warningText != null}">
+                                <td class="px" style="padding:22px 40px 4px;">
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fdf8ee; border:1px solid #efe1bd; border-radius:8px;">
+                                        <tr>
+                                            <td style="padding:14px 16px;">
+                                                <div th:if="${warningTitle != null}" style="margin:0 0 3px; color:#7a5c1e; font-size:12.5px; font-weight:700;" th:text="${warningTitle}">Importante</div>
+                                                <div th:if="${warningText != null}" style="color:#8a6d33; font-size:12.5px; line-height:19px;" th:text="${warningText}">No compartas este código con nadie, ni siquiera con nuestro personal.</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+
+                            <!-- Cierre -->
+                            <tr>
+                                <td class="px" style="padding:24px 40px 32px;">
+                                    <p style="margin:0; color:#667085; font-size:12.5px; line-height:20px;" th:text="${closingText}">
+                                        Si no solicitaste esta acción, puedes ignorar este mensaje de forma segura.
+                                    </p>
+                                </td>
+                            </tr>
+
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                    <td align="center" style="padding:26px 20px 8px;">
+                        <p style="margin:0 0 6px; color:#98a2b3; font-size:11.5px; line-height:17px;">
+                            <span th:text="${companyName}">DESCO</span> · <span th:text="${unitName}">UOT Sara Sara</span>
+                        </p>
+                        <p th:if="${supportEmail != null and !#strings.isEmpty(supportEmail)}"
+                           style="margin:0 0 6px; color:#98a2b3; font-size:11.5px; line-height:17px;">
+                            ¿Necesitas ayuda? Escríbenos a
+                            <a th:href="${'mailto:' + supportEmail}" th:text="${supportEmail}" style="color:#5c7793; font-weight:600;">soporte@desco.org.pe</a>
+                        </p>
+                        <p style="margin:10px 0 0; color:#b0b8c1; font-size:10.5px; line-height:16px;" th:text="${'© ' + currentYear + ' ' + companyName + '. Todos los derechos reservados.'}">
+                            © 2026 DESCO. Todos los derechos reservados.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

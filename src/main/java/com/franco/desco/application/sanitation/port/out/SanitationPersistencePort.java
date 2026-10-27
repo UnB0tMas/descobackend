@@ -1,0 +1,19 @@
+package com.franco.desco.application.sanitation.port.out;
+
+import com.franco.desco.application.sanitation.*;
+import com.franco.desco.application.sanitation.SanitationCommands.*;
+import com.franco.desco.application.shared.*;
+import com.franco.desco.application.shared.pagination.PageResult;
+import com.franco.desco.domain.sanitation.*;
+import java.util.*;
+
+public interface SanitationPersistencePort {
+    PersistenceResult<PageResult<SanitationModels.Summary>> list(SanitationCommands.ListCases c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<SanitationModels.Detail> get(SanitationCommands.Get c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Long> create(SanitationCommands.Create c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Void> update(SanitationCommands.Update c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Void> changeState(SanitationCommands.ChangeState c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Void> close(SanitationCommands.Close c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Long> addTreatment(SanitationCommands.Treatment c,SessionIdentity i,RequestMetadata m);
+    PersistenceResult<Long> addFollowUp(SanitationCommands.FollowUp c,SessionIdentity i,RequestMetadata m);
+}

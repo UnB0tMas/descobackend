@@ -1,0 +1,336 @@
+package com.franco.desco.adapter.in.web.resource;
+
+import com.franco.desco.adapter.in.security.JwtSessionIdentityResolver;
+import com.franco.desco.adapter.in.web.common.*;
+import com.franco.desco.adapter.in.web.common.idempotency.*;
+import com.franco.desco.adapter.in.web.openapi.OpenApiConstants;
+import com.franco.desco.application.resource.ResourceCommands;
+import com.franco.desco.application.resource.port.in.ResourceUseCase;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/recursos")
+@Tag(name = OpenApiConstants.TAG_RESOURCES, description = OpenApiConstants.TAG_RESOURCES_DESCRIPTION)
+@SecurityRequirement(name = OpenApiConstants.BEARER_AUTH)
+@Validated
+public class ResourceController {
+    private final ResourceUseCase useCase;
+    private final ResourceWebMapper mapper;
+    private final ApiResponseFactory responses;
+    private final JwtSessionIdentityResolver identities;
+    private final IdempotencyKeyResolver idempotency;
+
+    public ResourceController(
+            ResourceUseCase useCase,
+            ResourceWebMapper mapper,
+            ApiResponseFactory responses,
+            JwtSessionIdentityResolver identities,
+            IdempotencyKeyResolver idempotency
+    ) {
+        this.useCase = useCase;
+        this.mapper = mapper;
+        this.responses = responses;
+        this.identities = identities;
+        this.idempotency = idempotency;
+    }
+
+    @GetMapping("/bienes")
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'INVENTARIO_LISTAR')")
+    @Operation(operationId = "recursosBienesListar", summary = "Listar bienes patrimoniales por contexto UOT")
+    public ResponseEntity<ApiResponse<List<ResourceResponses.Asset>>> assets(
+            @RequestParam(required = false) @Positive Long uotId,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.assets(identities.resolve(authentication), uotId),
+                request,
+                values -> values.stream().map(mapper::response).toList()
+        );
+    }
+
+    @GetMapping("/bienes/{id}")
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'INVENTARIO_VER')")
+    @Operation(operationId = "recursosBienesVer", summary = "Ver detalle, historial e incidentes de un bien")
+    public ResponseEntity<ApiResponse<ResourceResponses.AssetDetail>> asset(
+            @PathVariable @Positive Long id,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.asset(identities.resolve(authentication), id),
+                request,
+                mapper::response
+        );
+    }
+
+    @PostMapping("/bienes")
+    @IdempotentOperation
+    @PreAuthorize("@permissionGuard.hasUot(authentication,#body.uotId,'INVENTARIO_CREAR')")
+    @Operation(operationId = "recursosBienesCrear", summary = "Registrar un bien patrimonial")
+    public ResponseEntity<ApiResponse<ResourceResponses.AssetCreated>> createAsset(
+            @Valid @RequestBody ResourceRequests.CreateAsset body,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        var command = new ResourceCommands.CreateAsset(
+                body.uotId(), body.tipoBienId(), body.codigoPatrimonial(), body.nombre(), body.marca(), body.modelo(),
+                body.serie(), body.fechaAdquisicion(), body.montoAdquisicion(), body.moneda(), body.proveedorPersonaId(),
+                body.proveedorEmpresaId(), body.observacion(), idempotency.required(request)
+        );
+        return responses.from(
+                useCase.createAsset(identities.resolve(authentication), command),
+                request,
+                ResourceResponses.AssetCreated::new
+        );
+    }
+
+    @PutMapping("/bienes/{id}")
+    @IdempotentOperation
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'INVENTARIO_EDITAR')")
+    @Operation(operationId = "recursosBienesEditar", summary = "Editar datos patrimoniales de un bien")
+    public ResponseEntity<ApiResponse<Void>> updateAsset(
+            @PathVariable @Positive Long id,
+            @Valid @RequestBody ResourceRequests.UpdateAsset body,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        var command = new ResourceCommands.UpdateAsset(
+                id, body.tipoBienId(), body.nombre(), body.marca(), body.modelo(), body.serie(), body.fechaAdquisicion(),
+                body.montoAdquisicion(), body.moneda(), body.proveedorPersonaId(), body.proveedorEmpresaId(), body.observacion()
+        );
+        return responses.from(useCase.updateAsset(identities.resolve(authentication), command), request);
+    }
+
+    @PostMapping("/bienes/{id}/estado")
+    @IdempotentOperation
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'INVENTARIO_EDITAR')")
+    @Operation(operationId = "recursosBienesCambiarEstado", summary = "Cambiar el estado operativo de un bien")
+    public ResponseEntity<ApiResponse<Void>> changeState(
+            @PathVariable @Positive Long id,
+            @Valid @RequestBody ResourceRequests.ChangeAssetState body,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.changeAssetState(
+                        identities.resolve(authentication),
+                        new ResourceCommands.ChangeAssetState(id, body.estado(), body.motivo())
+                ),
+                request
+        );
+    }
+
+    @PostMapping("/bienes/{id}/incidentes")
+    @IdempotentOperation
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'INVENTARIO_EDITAR')")
+    @Operation(operationId = "recursosBienesRegistrarIncidente", summary = "Registrar un incidente de un bien")
+    public ResponseEntity<ApiResponse<ResourceResponses.IncidentCreated>> incident(
+            @PathVariable @Positive Long id,
+            @Valid @RequestBody ResourceRequests.Incident body,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.reportIncident(
+                        identities.resolve(authentication),
+                        new ResourceCommands.ReportIncident(
+                                id, body.tipo(), body.fechaHora(), body.descripcion(), body.costoEstimado(),
+                                idempotency.required(request)
+                        )
+                ),
+                request,
+                ResourceResponses.IncidentCreated::new
+        );
+    }
+
+    @GetMapping("/productos")
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'PRODUCTOS_LISTAR')")
+    @Operation(operationId = "recursosProductosListar", summary = "Listar catálogo de productos con precio efectivo")
+    public ResponseEntity<ApiResponse<List<ResourceResponses.Product>>> products(
+            @RequestParam(required = false) @Positive Long uotId,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.products(identities.resolve(authentication), uotId),
+                request,
+                values -> values.stream().map(mapper::response).toList()
+        );
+    }
+
+    @PostMapping("/productos")
+    @IdempotentOperation
+    @PreAuthorize("@permissionGuard.hasUot(authentication,#body.uotContextoId,'PRODUCTOS_CREAR')")
+    @Operation(operationId = "recursosProductosCrear", summary = "Registrar un producto reutilizable")
+    public ResponseEntity<ApiResponse<ResourceResponses.ProductCreated>> createProduct(
+            @Valid @RequestBody ResourceRequests.CreateProduct body,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.createProduct(
+                        identities.resolve(authentication),
+                        new ResourceCommands.CreateProduct(
+                                body.uotContextoId(), body.codigo(), body.nombre(), body.descripcion(),
+                                body.unidadMedida(), body.categoria(), idempotency.required(request)
+                        )
+                ),
+                request,
+                ResourceResponses.ProductCreated::new
+        );
+    }
+
+    @PostMapping("/productos/{id}/precios")
+    @IdempotentOperation
+    @PreAuthorize("@permissionGuard.hasUot(authentication,#body.uotContextoId,'PRODUCTOS_PRECIO')")
+    @Operation(operationId = "recursosProductosVersionarPrecio", summary = "Crear una nueva versión de precio de venta")
+    public ResponseEntity<ApiResponse<ResourceResponses.PriceCreated>> price(
+            @PathVariable @Positive Long id,
+            @Valid @RequestBody ResourceRequests.VersionPrice body,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.versionPrice(
+                        identities.resolve(authentication),
+                        new ResourceCommands.VersionPrice(
+                                body.uotContextoId(), id, body.uotPrecioId(), body.precio(), body.moneda(),
+                                idempotency.required(request)
+                        )
+                ),
+                request,
+                ResourceResponses.PriceCreated::new
+        );
+    }
+
+    @GetMapping("/almacenes")
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'ALMACENES_LISTAR')")
+    @Operation(operationId = "recursosAlmacenesListar", summary = "Listar almacenes propios y compartidos")
+    public ResponseEntity<ApiResponse<List<ResourceResponses.Warehouse>>> warehouses(
+            @RequestParam(required = false) @Positive Long uotId,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.warehouses(identities.resolve(authentication), uotId),
+                request,
+                values -> values.stream().map(mapper::response).toList()
+        );
+    }
+
+    @PostMapping("/almacenes")
+    @IdempotentOperation
+    @PreAuthorize("@permissionGuard.hasUot(authentication,#body.uotId,'ALMACENES_CREAR')")
+    @Operation(operationId = "recursosAlmacenesCrear", summary = "Registrar un almacén")
+    public ResponseEntity<ApiResponse<ResourceResponses.WarehouseCreated>> createWarehouse(
+            @Valid @RequestBody ResourceRequests.CreateWarehouse body,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.createWarehouse(
+                        identities.resolve(authentication),
+                        new ResourceCommands.CreateWarehouse(
+                                body.uotId(), body.ubicacionId(), body.codigo(), body.nombre(), body.descripcion(),
+                                idempotency.required(request)
+                        )
+                ),
+                request,
+                ResourceResponses.WarehouseCreated::new
+        );
+    }
+
+    @PostMapping("/almacenes/{id}/compartir")
+    @IdempotentOperation
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'ALMACENES_CREAR')")
+    @Operation(operationId = "recursosAlmacenesCompartir", summary = "Compartir un almacén con otra UOT")
+    public ResponseEntity<ApiResponse<Void>> share(
+            @PathVariable @Positive Long id,
+            @Valid @RequestBody ResourceRequests.ShareWarehouse body,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.shareWarehouse(
+                        identities.resolve(authentication),
+                        new ResourceCommands.ShareWarehouse(id, body.uotId(), body.permiteEntrada(), body.permiteSalida())
+                ),
+                request
+        );
+    }
+
+    @GetMapping("/stock")
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'ALMACENES_LISTAR')")
+    @Operation(operationId = "recursosStockListar", summary = "Consultar stock actual, reservado y disponible")
+    public ResponseEntity<ApiResponse<List<ResourceResponses.Stock>>> stock(
+            @RequestParam(required = false) @Positive Long uotId,
+            @RequestParam(required = false) @Positive Long almacenId,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.stock(identities.resolve(authentication), uotId, almacenId),
+                request,
+                values -> values.stream().map(mapper::response).toList()
+        );
+    }
+
+    @GetMapping("/kardex")
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'ALMACENES_KARDEX')")
+    @Operation(operationId = "recursosKardexListar", summary = "Consultar Kardex de productos")
+    public ResponseEntity<ApiResponse<List<ResourceResponses.Kardex>>> kardex(
+            @RequestParam(required = false) @Positive Long uotId,
+            @RequestParam(required = false) @Positive Long almacenId,
+            @RequestParam(required = false) @Positive Long productoId,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(
+                useCase.kardex(identities.resolve(authentication), uotId, almacenId, productoId),
+                request,
+                values -> values.stream().map(mapper::response).toList()
+        );
+    }
+
+    @PostMapping("/movimientos")
+    @IdempotentOperation
+    @PreAuthorize("@permissionGuard.hasUot(authentication,#body.uotId,'ALMACENES_MOVIMIENTO')")
+    @Operation(operationId = "recursosMovimientosRegistrar", summary = "Registrar un movimiento de inventario")
+    public ResponseEntity<ApiResponse<ResourceResponses.MovementCreated>> movement(
+            @Valid @RequestBody ResourceRequests.RegisterMovement body,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        List<ResourceCommands.MovementLine> lines = body.detalle().stream()
+                .map(value -> new ResourceCommands.MovementLine(
+                        value.productoId(), value.cantidad(), value.costoUnitario(), value.moneda(),
+                        value.lote(), value.fechaVencimiento()
+                ))
+                .toList();
+
+        var command = new ResourceCommands.RegisterMovement(
+                body.uotId(), body.almacenId(), body.tipo(), body.naturaleza(), idempotency.required(request),
+                lines, body.proveedorPersonaId(), body.proveedorEmpresaId(), body.documentoReferencia(), body.observacion()
+        );
+
+        return responses.from(
+                useCase.registerMovement(identities.resolve(authentication), command),
+                request,
+                ResourceResponses.MovementCreated::new
+        );
+    }
+}

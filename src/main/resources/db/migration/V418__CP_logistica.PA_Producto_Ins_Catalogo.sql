@@ -1,0 +1,53 @@
+/* Registra definición compartida: NO crea precios de adquisición ni de venta. */
+CREATE OR ALTER PROCEDURE [logistica].[PA_Producto_Ins_Catalogo]
+    @nUsuarioId BIGINT, @nUotId BIGINT, @cCodigo VARCHAR(50),
+    @cNombre NVARCHAR(180), @cDescripcion NVARCHAR(700)=NULL,
+    @cUnidad VARCHAR(20), @cCategoria NVARCHAR(100)=NULL,
+    @bPermiteVenta BIT=0, @gClaveIdempotencia UNIQUEIDENTIFIER,
+    @nProductoId BIGINT OUTPUT, @bResultado BIT OUTPUT,
+    @cMensaje NVARCHAR(300) OUTPUT, @cCodigoRespuesta VARCHAR(60)=NULL OUTPUT,
+    @nHttpRespuesta SMALLINT=NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON; SET XACT_ABORT ON;
+    SELECT @nProductoId=NULL,@bResultado=0,@cMensaje=N'No se pudo registrar el producto.',
+           @cCodigoRespuesta='PRODUCTO_NO_CREADO',@nHttpRespuesta=400;
+    SELECT @cCodigo=UPPER(NULLIF(LTRIM(RTRIM(@cCodigo)),'')),
+           @cNombre=NULLIF(LTRIM(RTRIM(@cNombre)),N''),
+           @cUnidad=UPPER(NULLIF(LTRIM(RTRIM(@cUnidad)),'')),
+           @cCategoria=UPPER(NULLIF(LTRIM(RTRIM(@cCategoria)),N'')),
+           @cDescripcion=NULLIF(LTRIM(RTRIM(@cDescripcion)),N'');
+    IF @nUsuarioId IS NULL OR @nUotId IS NULL OR @gClaveIdempotencia IS NULL
+       OR @cCodigo IS NULL OR @cNombre IS NULL OR @cUnidad IS NULL
+    BEGIN SET @cMensaje=N'Complete los datos del catálogo.'; RETURN 1; END;
+    IF seg.FN_Usuario_TienePermisoUOT(@nUsuarioId,@nUotId,'PRODUCTOS_CREAR')=0
+    BEGIN SELECT @cMensaje=N'No tiene permiso para crear productos.',@cCodigoRespuesta='NO_AUTORIZADO',@nHttpRespuesta=403; RETURN 1; END;
+    IF NOT EXISTS(SELECT 1 FROM org.UOT WHERE uot_id=@nUotId AND estado=1)
+    BEGIN SET @cMensaje=N'La UOT no está disponible.'; RETURN 1; END;
+    IF NOT EXISTS(SELECT 1 FROM config.CatalogoRecursoValor WHERE catalogo='UNIDAD_MEDIDA' AND codigo=@cUnidad AND estado=1)
+    BEGIN SET @cMensaje=N'Unidad de medida no válida.'; RETURN 1; END;
+    IF @cCategoria IS NOT NULL AND NOT EXISTS(SELECT 1 FROM config.CatalogoRecursoValor WHERE catalogo='CATEGORIA_PRODUCTO' AND codigo=@cCategoria AND estado=1)
+    BEGIN SET @cMensaje=N'Categoría no válida.'; RETURN 1; END;
+    SELECT @nProductoId=producto_id FROM logistica.Producto WHERE clave_idempotencia=@gClaveIdempotencia;
+    IF @nProductoId IS NOT NULL
+    BEGIN SELECT @bResultado=1,@cMensaje=N'Producto registrado previamente.',@cCodigoRespuesta='PRODUCTO_CREADO',@nHttpRespuesta=200; RETURN 0; END;
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        IF EXISTS (SELECT 1 FROM logistica.Producto WITH (UPDLOCK,HOLDLOCK) WHERE codigo=@cCodigo)
+        BEGIN SELECT @cMensaje=N'El código ya existe.',@cCodigoRespuesta='PRODUCTO_CODIGO_DUPLICADO',@nHttpRespuesta=409; ROLLBACK; RETURN 1; END;
+        INSERT INTO logistica.Producto(codigo,nombre,descripcion,unidad_medida,categoria,permite_venta,estado,clave_idempotencia)
+        VALUES(@cCodigo,@cNombre,@cDescripcion,@cUnidad,@cCategoria,ISNULL(@bPermiteVenta,0),1,@gClaveIdempotencia);
+        SET @nProductoId=CONVERT(BIGINT,SCOPE_IDENTITY());
+        COMMIT;
+        SELECT @bResultado=1,@cMensaje=N'Producto agregado al catálogo.',@cCodigoRespuesta='PRODUCTO_CREADO',@nHttpRespuesta=201;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE()<>0 ROLLBACK;
+        IF ERROR_NUMBER() IN(2601,2627)
+            SELECT @cMensaje=N'Código o solicitud duplicada.',@cCodigoRespuesta='PRODUCTO_DUPLICADO',@nHttpRespuesta=409;
+        SET @nProductoId=NULL;
+        RETURN 1;
+    END CATCH;
+END;
+GO

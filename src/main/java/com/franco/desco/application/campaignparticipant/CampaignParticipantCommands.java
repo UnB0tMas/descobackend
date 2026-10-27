@@ -1,0 +1,2 @@
+package com.franco.desco.application.campaignparticipant;import com.franco.desco.application.shared.pagination.PageRequest;
+public final class CampaignParticipantCommands{private CampaignParticipantCommands(){}public record Filter(Long campaniaVentaId,String estadoParticipacion){}public record ListParticipants(PageRequest<Filter>page){}public record Get(Long participacionId){}public record Include(Long campaniaVentaId,Long socioAsociacionId){}public record Program(Long participacionId,Long operativoVentaId){}public record Remove(Long participacionId,String motivo){} }

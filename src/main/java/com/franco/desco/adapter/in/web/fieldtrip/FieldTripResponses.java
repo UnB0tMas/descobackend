@@ -1,0 +1,9 @@
+package com.franco.desco.adapter.in.web.fieldtrip;import io.swagger.v3.oas.annotations.media.Schema;import java.math.BigDecimal;import java.time.Instant;import java.util.List;
+public final class FieldTripResponses{private FieldTripResponses(){}@Schema(name="FieldTripCreatedResponse")public record Created(Long salidaCampoId){}
+ @Schema(name="FieldTripSummaryResponse")public record Summary(Long salidaCampoId,Integer motivoSalidaId,String motivo,Instant fechaHoraProgramada,Instant fechaHoraSalidaReal,Instant fechaHoraRetornoReal,String descripcion,String estadoProceso,boolean estado,Long participantes,Long recursosProgramados){}
+ @Schema(name="FieldTripParticipantResponse")public record Participant(Long salidaParticipanteId,Long empleadoId,String codigoEmpleado,String nombres,String apellidoPaterno,String apellidoMaterno,String funcion,boolean esResponsable,boolean estado){}
+ @Schema(name="FieldTripResourceResponse")public record Resource(Long recursoProgramadoId,Long bienInventarioId,String codigoPatrimonial,String bienNombre,Long suministroId,String suministroCodigo,String suministroNombre,String unidadMedida,BigDecimal cantidadProgramada,String observacion,String estado,BigDecimal cantidadEjecutada){}
+ @Schema(name="FieldTripAssetResponse")public record Asset(Long salidaBienId,Long bienInventarioId,String codigoPatrimonial,String nombre,Instant fechaHoraEntrega,Instant fechaHoraDevolucion,String estadoEntrega,String estadoDevolucion,String observacion,boolean estado){}
+ @Schema(name="FieldTripVisitResponse")public record Visit(Long visitaTecnicaId,Long salidaParticipanteId,Long predioId,String predioCodigo,String predioNombre,Instant fechaHoraInicio,Instant fechaHoraFin,String estadoProceso,boolean estado){}
+ @Schema(name="FieldTripDetailResponse")public record Detail(Summary salida,String motivoCodigo,List<Participant> participantes,List<Resource> recursos,List<Asset>bienes,List<Visit>visitas){}
+}
