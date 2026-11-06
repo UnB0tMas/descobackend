@@ -186,6 +186,7 @@ public class ResourceController {
                 body.proveedorPersonaId(),
                 body.proveedorEmpresaId(),
                 body.observacion(),
+                vehicleData(body.vehiculo()),
                 idempotency.required(request)
         );
 
@@ -224,7 +225,8 @@ public class ResourceController {
                 body.moneda(),
                 body.proveedorPersonaId(),
                 body.proveedorEmpresaId(),
-                body.observacion()
+                body.observacion(),
+                vehicleData(body.vehiculo())
         );
 
         return responses.from(
@@ -234,6 +236,10 @@ public class ResourceController {
                 ),
                 request
         );
+    }
+
+    private static ResourceCommands.VehicleData vehicleData(ResourceRequests.VehicleData value) {
+        return value == null ? null : new ResourceCommands.VehicleData(value.placa(), value.tipoVehiculo(), value.kilometrajeKm(), value.color());
     }
 
     @PostMapping("/bienes/{id}/estado")
@@ -369,7 +375,7 @@ public class ResourceController {
                                 body.categoria(),
                                 idempotency.required(request)
                         ),
-                        body.permiteVenta()
+                        body.permiteVenta(), body.precioVenta(), body.monedaVenta(), body.requiereLote(), body.controlaVencimiento()
                 ),
                 request,
                 ResourceResponses.ProductCreated::new
@@ -399,7 +405,7 @@ public class ResourceController {
                         body.categoria(),
                         body.requiereLote(),
                         body.controlaVencimiento(),
-                        body.permiteVenta()
+                        body.permiteVenta(), body.precioVenta(), body.monedaVenta()
                 ),
                 request
         );
@@ -601,6 +607,20 @@ public class ResourceController {
         );
     }
 
+    @PostMapping("/almacenes/{id}/productos/{productoId}/configuracion")
+    @IdempotentOperation
+    @PreAuthorize("@permissionGuard.hasUot(authentication,#body.uotId,'ALMACENES_MOVIMIENTO')")
+    @Operation(operationId = "recursosAlmacenesGestionarProducto", summary = "Editar, desactivar, reactivar o retirar un producto del almacén")
+    public ResponseEntity<ApiResponse<Void>> manageWarehouseProduct(
+            @PathVariable @Positive Long id, @PathVariable @Positive Long productoId,
+            @Valid @RequestBody ResourceRequests.ManageWarehouseProduct body,
+            @Parameter(hidden = true) JwtAuthenticationToken authentication,
+            @Parameter(hidden = true) HttpServletRequest request
+    ) {
+        return responses.from(experience.manageWarehouseProduct(identities.resolve(authentication), body.uotId(), id,
+                productoId, body.operacion(), body.stockMinimo(), body.motivo(), idempotency.required(request)), request);
+    }
+
     @PostMapping("/almacenes/{id}/productos")
     @IdempotentOperation
     @PreAuthorize("@permissionGuard.hasUot(authentication,#body.uotId,'ALMACENES_MOVIMIENTO')")
@@ -630,7 +650,7 @@ public class ResourceController {
                         body.fechaVencimiento(),
                         idempotency.required(request),
                         body.archivoSustentoId(),
-                        body.observacion()
+                        body.observacion(), body.monedaVenta()
                 ),
                 request,
                 mapper::response

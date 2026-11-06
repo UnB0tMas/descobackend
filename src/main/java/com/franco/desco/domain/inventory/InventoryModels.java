@@ -25,7 +25,7 @@ public final class InventoryModels {
     public record AssetDetail(
             Long bienInventarioId, Long empresaId, String empresa, Long tipoBienId, String tipoBien,
             String codigoPatrimonial, String nombre, String marca, String modelo, String serie,
-            String estadoBien, boolean estado, String placa, String tipoVehiculo, BigDecimal kilometrajeKm,
+            String estadoBien, boolean estado, String placa, String tipoVehiculo, BigDecimal kilometrajeKm, String color,
             List<Resource> recursos, List<Movement> movimientos
     ) {
         public AssetDetail {

@@ -68,6 +68,10 @@ public final class LogisticsOperationsService {
         return read("PA_ProductoUOT_Sel_Politicas",actor,uotId);
     }
 
+    public AppResult<List<Map<String,Object>>> transferProducts(SessionIdentity actor, Long source, Long destination) {
+        return read("PA_AlmacenProducto_Sel_Transferibles",actor,source,destination);
+    }
+
     public AppResult<List<Map<String,Object>>> programs(SessionIdentity actor,Long uotId,String state) {
         return read("PA_ProgramacionProducto_Sel_Listado",actor,uotId,state);
     }

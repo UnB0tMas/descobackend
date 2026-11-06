@@ -3,6 +3,7 @@ package com.franco.desco.adapter.in.web.resource;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -40,7 +41,8 @@ public final class ResourceRequests {
             @Pattern(regexp = "[A-Za-z]{3}") String moneda,
             @Positive Long proveedorPersonaId,
             @Positive Long proveedorEmpresaId,
-            @Size(max = 500) String observacion
+            @Size(max = 500) String observacion,
+            @Valid VehicleData vehiculo
     ) {
         @AssertTrue(message = "Seleccione solo una persona o una empresa como proveedor.")
         public boolean proveedorValido() {
@@ -61,7 +63,8 @@ public final class ResourceRequests {
             @Pattern(regexp = "[A-Za-z]{3}") String moneda,
             @Positive Long proveedorPersonaId,
             @Positive Long proveedorEmpresaId,
-            @Size(max = 500) String observacion
+            @Size(max = 500) String observacion,
+            @Valid VehicleData vehiculo
     ) {
         @AssertTrue(message = "Seleccione solo una persona o una empresa como proveedor.")
         public boolean proveedorValido() {
@@ -69,17 +72,25 @@ public final class ResourceRequests {
         }
     }
 
+    @Schema(name = "ResourceAssetVehicleRequest", description = "Datos del vehículo registrados junto al bien. Sin placa queda pendiente y no puede asignarse.")
+    public record VehicleData(
+            @Size(max = 12) @Pattern(regexp = "\\s*[A-Za-z0-9-]*\\s*") String placa,
+            @NotBlank @Size(max = 30) String tipoVehiculo,
+            @PositiveOrZero @Digits(integer = 11, fraction = 1) BigDecimal kilometrajeKm,
+            @Size(max = 50) String color
+    ) {}
+
     @Schema(name = "ResourceAssetStateChangeRequest")
     public record ChangeAssetState(
             @Schema(
                     allowableValues = {
                             "DISPONIBLE", "ASIGNADO", "MANTENIMIENTO", "AVERIADO",
-                            "INACTIVO", "BAJA", "NO_DISPONIBLE"
+                            "INACTIVO", "BAJA", "NO_DISPONIBLE", "PENDIENTE_PLACA"
                     },
                     example = "MANTENIMIENTO"
             )
             @NotBlank
-            @Pattern(regexp = "DISPONIBLE|ASIGNADO|MANTENIMIENTO|AVERIADO|INACTIVO|BAJA|NO_DISPONIBLE")
+            @Pattern(regexp = "DISPONIBLE|ASIGNADO|MANTENIMIENTO|AVERIADO|INACTIVO|BAJA|NO_DISPONIBLE|PENDIENTE_PLACA")
             String estado,
             @Size(max = 500) String motivo
     ) {
@@ -103,7 +114,7 @@ public final class ResourceRequests {
     @Schema(name = "ResourceProductCreateRequest")
     public record CreateProduct(
             @NotNull @Positive Long uotContextoId,
-            @Schema(description = "Código del producto. Si se omite o queda vacío, DESCO genera uno sugerido para la UOT.")
+            @Schema(description = "Código editable del producto. Si se omite o está vacío, DESCO genera uno para la UOT.")
             @Size(max = 50) String codigo,
             @NotBlank @Size(max = 180) String nombre,
             @Size(max = 700) String descripcion,
@@ -111,8 +122,16 @@ public final class ResourceRequests {
             @NotBlank @Size(max = 20) String unidadMedida,
             @Schema(description = "Código del catálogo CATEGORIA_PRODUCTO.")
             @Size(max = 40) String categoria,
-            boolean permiteVenta
+            @NotNull Boolean requiereLote,
+            @NotNull Boolean controlaVencimiento,
+            @NotNull Boolean permiteVenta,
+            @Positive @Digits(integer = 15, fraction = 4) BigDecimal precioVenta,
+            @Pattern(regexp = "[A-Za-z]{3}") String monedaVenta
     ) {
+        @AssertTrue(message = "Defina el precio de venta desde Almacén.")
+        public boolean precioComercialValido() {
+            return precioVenta == null && monedaVenta == null;
+        }
     }
 
     @Schema(name = "ResourceProductUpdateRequest")
@@ -124,10 +143,16 @@ public final class ResourceRequests {
             @NotBlank @Size(max = 20) String unidadMedida,
             @Schema(description = "Código del catálogo CATEGORIA_PRODUCTO.")
             @Size(max = 40) String categoria,
-            boolean requiereLote,
-            boolean controlaVencimiento,
-            boolean permiteVenta
+            @NotNull Boolean requiereLote,
+            @NotNull Boolean controlaVencimiento,
+            @NotNull Boolean permiteVenta,
+            @Positive @Digits(integer = 15, fraction = 4) BigDecimal precioVenta,
+            @Pattern(regexp = "[A-Za-z]{3}") String monedaVenta
     ) {
+        @AssertTrue(message = "Defina el precio de venta desde Almacén.")
+        public boolean precioComercialValido() {
+            return precioVenta == null && monedaVenta == null;
+        }
     }
 
     @Schema(name = "ResourceProductStateRequest")
@@ -140,7 +165,7 @@ public final class ResourceRequests {
     public record VersionPrice(
             @NotNull @Positive Long uotContextoId,
             @NotNull @Positive Long uotPrecioId,
-            @NotNull @Positive BigDecimal precioVenta,
+            @NotNull @Positive @Digits(integer = 15, fraction = 4) BigDecimal precioVenta,
             @Schema(example = "PEN", minLength = 3, maxLength = 3)
             @NotBlank @Pattern(regexp = "[A-Za-z]{3}") String moneda
     ) {
@@ -199,10 +224,10 @@ public final class ResourceRequests {
     public record ConfigureWarehouseProduct(
             @NotNull @Positive Long uotId,
             @NotNull @Positive Long productoId,
-            @NotNull @PositiveOrZero BigDecimal stockInicial,
-            @PositiveOrZero BigDecimal stockMinimo,
-            @PositiveOrZero BigDecimal costoUnitario,
-            @Positive BigDecimal precioVenta,
+            @NotNull @PositiveOrZero @Digits(integer = 16, fraction = 3) BigDecimal stockInicial,
+            @PositiveOrZero @Digits(integer = 16, fraction = 3) BigDecimal stockMinimo,
+            @PositiveOrZero @Digits(integer = 15, fraction = 4) BigDecimal costoUnitario,
+            @Positive @Digits(integer = 15, fraction = 4) BigDecimal precioVenta,
             @Schema(example = "PEN", minLength = 3, maxLength = 3)
             @Pattern(regexp = "[A-Za-z]{3}") String moneda,
             @Size(max = 80) String lote,
@@ -210,15 +235,24 @@ public final class ResourceRequests {
             LocalDate fechaVencimiento,
             @Positive(message = "El archivo de sustento seleccionado no es válido.")
             Long archivoSustentoId,
-            @Size(max = 500) String observacion
+            @Size(max = 500) String observacion,
+            @Pattern(regexp = "[A-Za-z]{3}") String monedaVenta
     ) {
     }
+
+    @Schema(name = "ResourceWarehouseProductManageRequest")
+    public record ManageWarehouseProduct(
+            @NotNull @Positive Long uotId,
+            @NotBlank @Pattern(regexp = "EDITAR|DESACTIVAR|REACTIVAR|RETIRAR") String operacion,
+            @PositiveOrZero @Digits(integer = 16, fraction = 3) BigDecimal stockMinimo,
+            @NotBlank @Size(max = 500) String motivo
+    ) {}
 
     @Schema(name = "ResourceMovementLineRequest")
     public record MovementLine(
             @NotNull @Positive Long productoId,
-            @NotNull @Positive BigDecimal cantidad,
-            @PositiveOrZero BigDecimal costoUnitario,
+            @NotNull @Positive @Digits(integer = 16, fraction = 3) BigDecimal cantidad,
+            @PositiveOrZero @Digits(integer = 15, fraction = 4) BigDecimal costoUnitario,
             @Schema(example = "PEN", minLength = 3, maxLength = 3)
             @Pattern(regexp = "[A-Za-z]{3}") String moneda,
             @Size(max = 80) String lote,
@@ -234,11 +268,11 @@ public final class ResourceRequests {
             @Schema(
                     allowableValues = {
                             "COMPRA", "DONACION", "DEVOLUCION", "VENTA", "CONSUMO",
-                            "TRANSFERENCIA", "AJUSTE", "MERMA", "OTRO"
+                            "AJUSTE", "MERMA", "OTRO"
                     }
             )
             @NotBlank
-            @Pattern(regexp = "COMPRA|DONACION|DEVOLUCION|VENTA|CONSUMO|TRANSFERENCIA|AJUSTE|MERMA|OTRO")
+            @Pattern(regexp = "COMPRA|DONACION|DEVOLUCION|VENTA|CONSUMO|AJUSTE|MERMA|OTRO")
             String tipo,
             @Schema(
                     allowableValues = {"E", "S"},

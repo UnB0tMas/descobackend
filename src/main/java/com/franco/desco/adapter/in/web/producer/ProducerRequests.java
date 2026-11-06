@@ -26,8 +26,7 @@ public final class ProducerRequests {
 
     @Schema(name = "ProducerLocationRequest")
     public record Location(
-            @NotBlank
-            @Pattern(regexp = "\\d{6}", message = "Seleccione un distrito válido.")
+            @Pattern(regexp = "(?:\\d{6})?", message = "Seleccione un distrito válido.")
             String distritoCodigo,
             @Positive(message = "El centro poblado seleccionado no es válido.")
             Long centroPobladoId,
@@ -42,11 +41,11 @@ public final class ProducerRequests {
             @Pattern(regexp = "DNI|RUC|CE|PASAPORTE|OTRO")
             String tipoDocumento,
             @NotBlank @Size(max = 30) String numeroDocumento,
-            @NotBlank @Size(max = 100)
-            @Pattern(regexp = PERSON_NAME_PATTERN)
+            @Size(max = 100)
+            @Pattern(regexp = PERSON_NAME_PATTERN + "|^$")
             String nombres,
-            @NotBlank @Size(max = 80)
-            @Pattern(regexp = PERSON_NAME_PATTERN)
+            @Size(max = 80)
+            @Pattern(regexp = PERSON_NAME_PATTERN + "|^$")
             String apellidoPaterno,
             @Size(max = 80)
             @Pattern(regexp = PERSON_NAME_PATTERN)

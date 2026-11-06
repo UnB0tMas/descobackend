@@ -59,6 +59,7 @@ public final class ResourceModels {
             String plate,
             String vehicleType,
             BigDecimal mileageKm,
+            String color,
             Long mainImageFileId,
             int openIncidents,
             boolean active,
@@ -221,8 +222,53 @@ public final class ResourceModels {
             BigDecimal reserved,
             BigDecimal available,
             BigDecimal minimum,
-            LocalDateTime updatedAt
+            LocalDateTime updatedAt,
+            boolean active,
+            boolean hasHistory
     ) {
+        // Compatibilidad con adaptadores que todavia construyen Stock con 11 argumentos.
+        // Si el adaptador antiguo no informa historial, se asume que existe por seguridad.
+        // La fuente real debe venir del adaptador SQL para recuperar la operacion RETIRAR.
+        public Stock(
+                Long warehouseId,
+                String warehouse,
+                Long productId,
+                String product,
+                String unit,
+                BigDecimal current,
+                BigDecimal reserved,
+                BigDecimal available,
+                BigDecimal minimum,
+                LocalDateTime updatedAt,
+                boolean active
+        ) {
+            this(warehouseId, warehouse, productId, product, unit,
+                    current, reserved, available, minimum, updatedAt, active, true);
+        }
+
+        /**
+         * Firma legada del adaptador de recursos SQL (10 argumentos).
+         * No se pueden recuperar estado ni historial desde los diez valores.
+         * Se mantiene el producto visible y, por seguridad, se considera
+         * que existe historial para no autorizar retiros sin verificarlo.
+         * El adaptador SQL debe migrar a la firma de 12 argumentos y
+         * proporcionar los dos indicadores reales de la base de datos.
+         */
+        public Stock(
+                Long warehouseId,
+                String warehouse,
+                Long productId,
+                String product,
+                String unit,
+                BigDecimal current,
+                BigDecimal reserved,
+                BigDecimal available,
+                BigDecimal minimum,
+                LocalDateTime updatedAt
+        ) {
+            this(warehouseId, warehouse, productId, product, unit,
+                    current, reserved, available, minimum, updatedAt, true, true);
+        }
     }
 
     public record Kardex(

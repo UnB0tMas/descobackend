@@ -71,16 +71,17 @@ public final class PropertyRequests {
 
     @Schema(name = "PropertyOwnerRequest")
     public record Owner(
-            @NotNull @Positive Long socioId,
-            @NotBlank
-            @Pattern(regexp = "PROPIETARIO|COPROPIETARIO|POSESIONARIO|ARRENDATARIO|OTRO")
-            String tipoTitularidad,
+            @Positive Long personaId,
+            @Positive Long socioId, // compatibilidad con clientes antiguos
+            @NotBlank @Size(max = 20) String tipoTitularidad,
             @NotNull
             @DecimalMin("0.01")
             @DecimalMax("100.00")
             @Digits(integer = 3, fraction = 2)
             BigDecimal porcentaje
     ) {
+        @AssertTrue(message = "Indique la persona titular.")
+        public boolean tienePersona() { return personaId != null || socioId != null; }
     }
 
     @Schema(name = "PropertyCreateRequest")
@@ -135,11 +136,11 @@ public final class PropertyRequests {
         BigDecimal total = BigDecimal.ZERO;
 
         for (Owner owner : owners) {
-            if (owner == null || owner.socioId() == null) {
+            if (owner == null || (owner.personaId() == null && owner.socioId() == null)) {
                 continue;
             }
 
-            if (!ids.add(owner.socioId())) {
+            if (!ids.add(owner.personaId() != null ? owner.personaId() : owner.socioId())) {
                 return false;
             }
 

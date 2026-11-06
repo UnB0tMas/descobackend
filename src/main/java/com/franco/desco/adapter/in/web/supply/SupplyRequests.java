@@ -3,6 +3,7 @@ package com.franco.desco.adapter.in.web.supply;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -23,8 +24,8 @@ public final class SupplyRequests {
             @NotBlank @Size(max = 150) String nombre,
             @Schema(description = "Código del catálogo UNIDAD_MEDIDA.")
             @NotBlank @Size(max = 20) String unidadMedida,
-            @NotNull @PositiveOrZero BigDecimal stockInicial,
-            @PositiveOrZero BigDecimal stockMinimo
+            @NotNull @PositiveOrZero @Digits(integer = 11, fraction = 3) BigDecimal stockInicial,
+            @PositiveOrZero @Digits(integer = 11, fraction = 3) BigDecimal stockMinimo
     ) {
     }
 
@@ -34,7 +35,7 @@ public final class SupplyRequests {
             @NotBlank @Size(max = 150) String nombre,
             @Schema(description = "Código del catálogo UNIDAD_MEDIDA.")
             @NotBlank @Size(max = 20) String unidadMedida,
-            @PositiveOrZero BigDecimal stockMinimo
+            @PositiveOrZero @Digits(integer = 11, fraction = 3) BigDecimal stockMinimo
     ) {
     }
 
@@ -44,7 +45,7 @@ public final class SupplyRequests {
             @NotBlank
             @Pattern(regexp = "ENTRADA|AJUSTE_ENTRADA|AJUSTE_SALIDA")
             String tipoMovimiento,
-            @NotNull @Positive BigDecimal cantidad,
+            @NotNull @Positive @Digits(integer = 11, fraction = 3) BigDecimal cantidad,
             @Size(max = 120) String documentoReferencia,
             @Size(max = 300) String observacion
     ) {

@@ -15,9 +15,9 @@ public final class PropertyModels {
     ) {}
 
     public record Owner(
-            Long predioTitularidadId, Long socioId, String tipoDocumento, String numeroDocumento,
+            Long predioTitularidadId, Long personaId, Long socioId, String tipoDocumento, String numeroDocumento,
             String nombres, String apellidoPaterno, String apellidoMaterno, String tipoTitularidad,
-            BigDecimal porcentaje, LocalDate fechaDesde, LocalDate fechaHasta, boolean estado
+            BigDecimal porcentaje, String rolTitularidad, LocalDate fechaDesde, LocalDate fechaHasta, boolean estado
     ) {}
 
     public record Version(

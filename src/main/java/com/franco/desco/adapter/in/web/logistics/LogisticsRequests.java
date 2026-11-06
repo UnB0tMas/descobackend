@@ -17,7 +17,7 @@ public final class LogisticsRequests {
     ) {}
 
     public record TransferLine(@NotNull @Positive Long productoId,
-                               @NotNull @DecimalMin("0.001") BigDecimal cantidad) {}
+                               @NotNull @DecimalMin("0.001") @Digits(integer = 16, fraction = 3) BigDecimal cantidad) {}
 
     public record Transfer(
             @NotNull @Positive Long almacenOrigenId,
@@ -31,7 +31,7 @@ public final class LogisticsRequests {
             @NotNull @Positive Long almacenId,
             @NotNull @Positive Long productoId,
             @NotNull @Positive Long empleadoId,
-            @NotNull @DecimalMin("0.001") BigDecimal cantidad,
+            @NotNull @DecimalMin("0.001") @Digits(integer = 16, fraction = 3) BigDecimal cantidad,
             @NotBlank @Size(max=250) String actividad,
             @NotBlank @Size(max=300) String lugar,
             @NotNull LocalDateTime fechaInicio,
@@ -47,7 +47,7 @@ public final class LogisticsRequests {
 
     public record ProductOperation(
             @NotBlank @Pattern(regexp="APROBAR|RECHAZAR|ENTREGAR|DEVOLVER|CONSUMIR|CERRAR|CANCELAR") String operacion,
-            @DecimalMin("0.001") BigDecimal cantidad,
+            @DecimalMin("0.001") @Digits(integer = 16, fraction = 3) BigDecimal cantidad,
             @Size(max=300) String observacion
     ) {}
 

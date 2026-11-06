@@ -40,6 +40,8 @@ public final class AuthApplicationService implements AuthUseCase {
     private final SecurityMailPort mailPort;
     private final SecurityNotificationPort notificationPort;
     private final AccessTokenPort accessTokenPort;
+    private final boolean smtpEnabled;
+    private final boolean devAutoVerifyOtp;
 
     public AuthApplicationService(
             AuthPersistencePort authPersistence,
@@ -49,7 +51,9 @@ public final class AuthApplicationService implements AuthUseCase {
             RefreshTokenPort refreshTokenPort,
             SecurityMailPort mailPort,
             SecurityNotificationPort notificationPort,
-            AccessTokenPort accessTokenPort
+            AccessTokenPort accessTokenPort,
+            boolean smtpEnabled,
+            boolean devAutoVerifyOtp
     ) {
         this.authPersistence = authPersistence;
         this.passwordHash = passwordHash;
@@ -59,6 +63,8 @@ public final class AuthApplicationService implements AuthUseCase {
         this.mailPort = mailPort;
         this.notificationPort = notificationPort;
         this.accessTokenPort = accessTokenPort;
+        this.smtpEnabled = smtpEnabled;
+        this.devAutoVerifyOtp = devAutoVerifyOtp;
     }
 
     @Override
@@ -149,6 +155,13 @@ public final class AuthApplicationService implements AuthUseCase {
             RequestTwoFactorCommand command,
             RequestMetadata metadata
     ) {
+        if (!smtpEnabled) {
+            return AppResult.error(
+                    AppStatus.SERVICE_UNAVAILABLE,
+                    "SEGUNDO_FACTOR_CORREO_DESHABILITADO",
+                    "El reenvío por correo está deshabilitado. Reinicie el inicio de sesión."
+            );
+        }
         OtpPort.GeneratedOtp otp = otpPort.generate();
 
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -266,6 +279,10 @@ public final class AuthApplicationService implements AuthUseCase {
             RequestEmailVerificationCommand command,
             RequestMetadata metadata
     ) {
+        // Endpoint público: nunca auto-verificar un correo por nombre de usuario.
+        if (!smtpEnabled) {
+            return AppResult.ok("VALIDACION_SOLICITADA", GENERIC_EMAIL_VERIFICATION_MESSAGE, null);
+        }
         String username = normalizeUsername(command.nombreUsuario());
         OtpPort.GeneratedOtp otp = otpPort.generate();
 
@@ -373,6 +390,10 @@ public final class AuthApplicationService implements AuthUseCase {
             PasswordRecoveryCommand command,
             RequestMetadata metadata
     ) {
+        // Mantener respuesta genérica: no emitir OTP recuperables sin canal de entrega.
+        if (!smtpEnabled) {
+            return AppResult.ok("RECUPERACION_SOLICITADA", GENERIC_RECOVERY_MESSAGE, null);
+        }
         String username = normalizeUsername(command.nombreUsuario());
 
         log.info(
@@ -758,6 +779,10 @@ public final class AuthApplicationService implements AuthUseCase {
             UUID correlationId,
             RequestMetadata metadata
     ) {
+        if (!smtpEnabled && !devAutoVerifyOtp) {
+            return AppResult.error(AppStatus.SERVICE_UNAVAILABLE,
+                    "CORREO_DESHABILITADO", "La verificación de correo requiere un canal de entrega disponible.");
+        }
         if (userId == null) {
             return AppResult.error(
                     AppStatus.UNAUTHORIZED,
@@ -787,6 +812,40 @@ public final class AuthApplicationService implements AuthUseCase {
                             "No se pudo generar la validación de correo."
                     )
             );
+        }
+
+        if (!smtpEnabled) {
+            // SOLO DESARROLLO, después de una contraseña validada por login().
+            // Se valida el hash real contra el PA; jamás se envía OTP al navegador.
+            if (!issue.debeEnviar() || issue.codigoUnSoloUsoId() == null) {
+                return AppResult.error(AppStatus.BAD_REQUEST,
+                        "OTP_DESARROLLO_NO_EMITIDO", "No se pudo emitir un código de validación nuevo.");
+            }
+            Map<String, Object> verification = new LinkedHashMap<>();
+            verification.put("usuarioId", userId);
+            verification.put("codigoHmacHex", otp.hmacHex());
+            verification.put("ip", metadata.ip());
+            verification.put("correlacionId", correlationId);
+            AuthPersistencePort.ProcedureResult verified = authPersistence.verifyEmail(verification);
+            if (!verified.exitoso()) {
+                return AppResult.error(AppStatus.UNAUTHORIZED,
+                        "VALIDACION_CORREO_NO_COMPLETADA", "La validación interna no pudo completarse.");
+            }
+            log.warn("[AUTH] DEV correo validado por PA sin envío SMTP correlationId={}", correlationId);
+            // Volver a consultar la decisión del PA: el administrador puede requerir 2FA.
+            LoginDecision next = authPersistence.registerCredentialResult(
+                    loginDecisionPayload(userId, username, true,
+                            deviceFingerprint.fingerprint(metadata), metadata));
+            if (!next.exitoso()) {
+                return AppResult.error(AppStatus.UNAUTHORIZED,
+                        "LOGIN_NO_DISPONIBLE", GENERIC_LOGIN_MESSAGE);
+            }
+            return switch (safeUpper(next.pasoSiguiente())) {
+                case "SEGUNDO_FACTOR" -> startTwoFactor(userId, correlationId, metadata);
+                case "CREAR_SESION" -> createAuthenticatedSession(userId, correlationId, metadata);
+                default -> AppResult.error(AppStatus.UNAUTHORIZED,
+                        "LOGIN_NO_DISPONIBLE", "No se pudo completar la autenticación.");
+            };
         }
 
         if (issue.debeEnviar()
@@ -830,6 +889,10 @@ public final class AuthApplicationService implements AuthUseCase {
             UUID correlationId,
             RequestMetadata metadata
     ) {
+        if (!smtpEnabled && !devAutoVerifyOtp) {
+            return AppResult.error(AppStatus.SERVICE_UNAVAILABLE,
+                    "CORREO_DESHABILITADO", "El segundo factor requiere un canal de entrega disponible.");
+        }
         if (userId == null) {
             return AppResult.error(
                     AppStatus.UNAUTHORIZED,
@@ -858,6 +921,17 @@ public final class AuthApplicationService implements AuthUseCase {
                             "No se pudo generar el segundo factor."
                     )
             );
+        }
+
+        if (!smtpEnabled) {
+            if (!issue.debeEnviar() || issue.codigoUnSoloUsoId() == null) {
+                return AppResult.error(AppStatus.BAD_REQUEST,
+                        "OTP_DESARROLLO_NO_EMITIDO", "No se pudo emitir un código nuevo. Reintente el inicio de sesión.");
+            }
+            log.warn("[AUTH] DEV 2FA validado internamente por PA correlationId={}", correlationId);
+            // Misma operación del PA que al ingresar el OTP manualmente, sin mostrarlo.
+            return verifyTwoFactor(
+                    new VerifyTwoFactorCommand(userId, otp.code(), correlationId), metadata);
         }
 
         if (issue.debeEnviar()
@@ -1008,6 +1082,9 @@ public final class AuthApplicationService implements AuthUseCase {
             AccessContext context,
             RequestMetadata metadata
     ) {
+        if (!smtpEnabled) {
+            return;
+        }
         if (session == null
                 || !session.nuevoDispositivo()
                 || context == null
@@ -1126,6 +1203,9 @@ public final class AuthApplicationService implements AuthUseCase {
             OtpIssue issue,
             Runnable sender
     ) {
+        if (!smtpEnabled) {
+            return false;
+        }
         String event = safeLogValue(mailEvent);
 
         String recipient =

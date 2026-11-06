@@ -57,7 +57,8 @@ public final class InventoryCommands {
             Long bienInventarioId,
             String placa,
             String tipoVehiculo,
-            BigDecimal kilometrajeKm
+            BigDecimal kilometrajeKm,
+            String color
     ) {
     }
 

@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
@@ -21,7 +22,7 @@ public final class ResourceProgramRequests {
             Long salidaCampoId,
             Long bienInventarioId,
             Long suministroId,
-            @NotNull @Positive BigDecimal cantidadProgramada,
+            @NotNull @Positive @Digits(integer = 11, fraction = 3) BigDecimal cantidadProgramada,
             @Size(max = 300) String observacion
     ) {
         @AssertTrue(message = "Seleccione un único destino para el recurso.")
@@ -44,21 +45,21 @@ public final class ResourceProgramRequests {
 
     @Schema(name = "ResourceProgramUpdateRequest")
     public record Update(
-            @NotNull @Positive BigDecimal cantidadProgramada,
+            @NotNull @Positive @Digits(integer = 11, fraction = 3) BigDecimal cantidadProgramada,
             @Size(max = 300) String observacion
     ) {
     }
 
     @Schema(name = "ResourceProgramReturnResourceRequest")
     public record ReturnResource(
-            @NotNull @Positive BigDecimal cantidadDevuelta,
+            @NotNull @Positive @Digits(integer = 11, fraction = 3) BigDecimal cantidadDevuelta,
             @Size(max = 300) String observacion
     ) {
     }
 
     @Schema(name = "ResourceProgramConsumeRequest")
     public record Consume(
-            @Positive BigDecimal cantidadConsumida,
+            @Positive @Digits(integer = 11, fraction = 3) BigDecimal cantidadConsumida,
             @Size(max = 300) String observacion
     ) {
     }

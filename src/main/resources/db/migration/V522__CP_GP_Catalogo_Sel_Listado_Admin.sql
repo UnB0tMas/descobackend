@@ -1,0 +1,28 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+DROP PROCEDURE IF EXISTS prod.PA_GP_Catalogo_Sel_Listado;
+GO
+IF OBJECT_ID(N'prod.PA_GP_Catalogo_Sel_Listado', N'P') IS NOT NULL DROP PROCEDURE prod.PA_GP_Catalogo_Sel_Listado;
+GO
+CREATE PROCEDURE prod.PA_GP_Catalogo_Sel_Listado
+@Sesion UNIQUEIDENTIFIER,@Usuario BIGINT,@Uot BIGINT
+AS
+BEGIN
+  SET NOCOUNT ON;
+IF prod.FN_GP_Permiso(@Sesion,@Usuario,@Uot,'PREDIOS_VER',0)<>1 AND prod.FN_GP_Permiso(@Sesion,@Usuario,@Uot,'CATALOGOS_LISTAR',0)<>1 THROW 51101,N'Acceso no autorizado.',1;
+ SELECT 'CULTIVO' AS tipo,CAST(cultivo_id AS BIGINT) AS id,CAST(NULL AS BIGINT) AS padreId,nombre COLLATE DATABASE_DEFAULT AS nombre,CAST(NULL AS NVARCHAR(1000)) AS descripcion FROM prod.Cultivo WHERE estado=1
+ UNION ALL
+ SELECT 'CRIANZA',CAST(especie_pecuaria_id AS BIGINT),NULL,nombre COLLATE DATABASE_DEFAULT,NULL FROM prod.EspeciePecuaria WHERE estado=1
+ UNION ALL
+ SELECT 'PROBLEMA_CULTIVO',CAST(problema_id AS BIGINT),CAST(cultivo_id AS BIGINT),nombre COLLATE DATABASE_DEFAULT,NULL FROM prod.GPProblema WHERE cultivo_id IS NOT NULL AND estado=1
+ UNION ALL
+ SELECT 'PROBLEMA_CRIANZA',CAST(problema_id AS BIGINT),CAST(especie_pecuaria_id AS BIGINT),nombre COLLATE DATABASE_DEFAULT,NULL FROM prod.GPProblema WHERE especie_pecuaria_id IS NOT NULL AND estado=1
+ UNION ALL
+ SELECT 'TRATAMIENTO',CAST(tratamiento_id AS BIGINT),NULL,nombre COLLATE DATABASE_DEFAULT,descripcion FROM prod.GPTratamiento WHERE estado=1
+ UNION ALL
+ SELECT 'RELACION',CAST(tratamiento_id AS BIGINT),CAST(problema_id AS BIGINT),CAST(NULL AS NVARCHAR(160)),NULL FROM prod.GPProblemaTratamiento
+ ORDER BY tipo,nombre;
+END;
+GO

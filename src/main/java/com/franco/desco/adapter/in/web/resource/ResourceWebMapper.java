@@ -24,7 +24,7 @@ public class ResourceWebMapper {
                 value.name(), value.brand(), value.model(), value.serial(), value.state(),
                 value.acquisitionDate(), value.acquisitionAmount(), value.acquisitionCurrency(),
                 value.providerPersonId(), value.providerCompanyId(), value.providerName(), value.observation(),
-                value.plate(), value.vehicleType(), value.mileageKm(), value.mainImageFileId(),
+                value.plate(), value.vehicleType(), value.mileageKm(), value.color(), value.mainImageFileId(),
                 contentUrl(value.mainImageFileId()), value.openIncidents(), value.active()
         );
     }
@@ -104,7 +104,7 @@ public class ResourceWebMapper {
     public ResourceResponses.Stock response(ResourceModels.Stock value) {
         return new ResourceResponses.Stock(
                 value.warehouseId(), value.warehouse(), value.productId(), value.product(), value.unit(),
-                value.current(), value.reserved(), value.available(), value.minimum(), value.updatedAt()
+                value.current(), value.reserved(), value.available(), value.minimum(), value.updatedAt(), value.active(), value.hasHistory()
         );
     }
 

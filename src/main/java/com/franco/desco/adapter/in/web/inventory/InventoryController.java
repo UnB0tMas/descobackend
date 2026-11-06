@@ -188,7 +188,7 @@ public class InventoryController {
                                 id,
                                 body.placa(),
                                 body.tipoVehiculo(),
-                                body.kilometrajeKm()
+                                body.kilometrajeKm(), body.color()
                         ),
                         identities.resolve(authentication),
                         metadata.resolve(request)

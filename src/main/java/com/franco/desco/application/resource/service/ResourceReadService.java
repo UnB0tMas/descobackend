@@ -134,7 +134,7 @@ public class ResourceReadService {
                 rs.getString("nombre"), rs.getString("marca"), rs.getString("modelo"), rs.getString("serie"), rs.getString("estadoBien"),
                 date(rs,"fechaAdquisicion"), rs.getBigDecimal("montoAdquisicion"), rs.getString("monedaAdquisicion"),
                 nullableLong(rs,"proveedorPersonaId"), nullableLong(rs,"proveedorEmpresaId"), rs.getString("proveedorNombre"), rs.getString("observacion"),
-                rs.getString("placa"), rs.getString("tipoVehiculo"), rs.getBigDecimal("kilometrajeKm"), nullableLong(rs,"archivoPrincipalId"),
+                rs.getString("placa"), rs.getString("tipoVehiculo"), rs.getBigDecimal("kilometrajeKm"), rs.getString("color"), nullableLong(rs,"archivoPrincipalId"),
                 rs.getInt("incidentesAbiertos"), rs.getBoolean("estado"), rs.getLong("totalRegistros"));
     }
 

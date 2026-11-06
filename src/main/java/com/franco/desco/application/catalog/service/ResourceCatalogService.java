@@ -33,7 +33,8 @@ public class ResourceCatalogService {
             "UNIDAD_MEDIDA",
             "CATEGORIA_PRODUCTO",
             "MONEDA",
-            "CARGO_EMPLEADO"
+            "CARGO_EMPLEADO",
+            "TIPO_TITULARIDAD_PREDIO"
     );
 
     private final SimpleJdbcCall listCall;

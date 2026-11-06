@@ -10,10 +10,11 @@ public final class ResourceCommands {
 
     public record CreateAsset(Long uotId, Integer assetTypeId, String patrimonialCode, String name, String brand, String model,
                               String serial, LocalDate acquisitionDate, BigDecimal acquisitionAmount, String currency,
-                              Long providerPersonId, Long providerCompanyId, String observation, UUID idempotencyKey) {}
+                              Long providerPersonId, Long providerCompanyId, String observation, VehicleData vehicle, UUID idempotencyKey) {}
     public record UpdateAsset(Long assetId, Integer assetTypeId, String name, String brand, String model, String serial,
                               LocalDate acquisitionDate, BigDecimal acquisitionAmount, String currency,
-                              Long providerPersonId, Long providerCompanyId, String observation) {}
+                              Long providerPersonId, Long providerCompanyId, String observation, VehicleData vehicle) {}
+    public record VehicleData(String plate, String type, BigDecimal mileage, String color) {}
     public record ChangeAssetState(Long assetId, String state, String reason) {}
     public record ReportIncident(Long assetId, String type, LocalDateTime dateTime, String description, BigDecimal estimatedCost, UUID idempotencyKey) {}
 

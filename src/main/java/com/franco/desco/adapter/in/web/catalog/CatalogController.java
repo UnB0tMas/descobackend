@@ -62,7 +62,7 @@ public class CatalogController {
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.has(authentication,'REFERENCIAS_LISTAR')")
+    @PreAuthorize("@permissionGuard.has(authentication,'REFERENCIAS_LISTAR') or (#catalogo == 'TIPO_TITULARIDAD' and @permissionGuard.has(authentication,'PREDIOS_LISTAR'))")
     @Operation(operationId = "catalogosListar", summary = "Listar valores de catálogo")
     public ResponseEntity<ApiResponse<PageResponse<CatalogResponses.Item>>> list(
             @RequestParam String catalogo,

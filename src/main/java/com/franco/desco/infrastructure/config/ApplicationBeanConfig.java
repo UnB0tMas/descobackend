@@ -105,9 +105,15 @@ import com.franco.desco.application.dashboard.service.DashboardApplicationServic
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 @Configuration
 public class ApplicationBeanConfig {
+
+    @Bean
+    SmtpMode smtpMode(Environment environment) {
+        return SmtpMode.from(environment);
+    }
 
     @Bean
     AuthUseCase authUseCase(
@@ -124,7 +130,8 @@ public class ApplicationBeanConfig {
             @Qualifier("authSqlServerAdapter")
             SecurityNotificationPort notificationPort,
             @Qualifier("jwtAccessTokenAdapter")
-            AccessTokenPort accessTokenPort
+            AccessTokenPort accessTokenPort,
+            SmtpMode smtpMode
     ) {
         return new AuthApplicationService(
                 authPersistencePort,
@@ -134,7 +141,9 @@ public class ApplicationBeanConfig {
                 refreshTokenPort,
                 securityMailPort,
                 notificationPort,
-                accessTokenPort
+                accessTokenPort,
+                smtpMode.enabled(),
+                smtpMode.devAutoVerifyOtp()
         );
     }
 
@@ -175,14 +184,16 @@ public class ApplicationBeanConfig {
             @Qualifier("smtpSecurityMailAdapter")
             SecurityMailPort securityMailPort,
             @Qualifier("authSqlServerAdapter")
-            SecurityNotificationPort securityNotificationPort
+            SecurityNotificationPort securityNotificationPort,
+            SmtpMode smtpMode
     ) {
         return new AccountApplicationService(
                 persistence,
                 passwordHashPort,
                 otpPort,
                 securityMailPort,
-                securityNotificationPort
+                securityNotificationPort,
+                smtpMode.enabled()
         );
     }
 

@@ -145,7 +145,7 @@ public class ConvenioService {
             return AppResult.error(AppStatus.FORBIDDEN, "SIN_ACCESO", "No puede consultar socios de APAPPSS.");
         return AppResult.ok("ASOCIACIONES_APAPPSS", "Asociaciones habilitadas en esta UOT.", jdbc.query(
                 """
-                SELECT DISTINCT E.empresa_id,E.razon_social
+                SELECT DISTINCT E.empresa_id,E.razon_social,C.convenio_uot_organizacion_id
                 FROM org.ConvenioUOTOrganizacion C
                 JOIN org.Empresa E ON E.empresa_id=C.empresa_id AND E.estado=1
                 JOIN org.Asociacion A ON A.asociacion_id=E.empresa_id AND A.estado=1
@@ -156,8 +156,8 @@ public class ConvenioService {
                 WHERE C.uot_id=? AND C.estado=1
                   AND (C.fecha_inicio IS NULL OR C.fecha_inicio<=CONVERT(date,SYSUTCDATETIME()))
                   AND (C.fecha_fin IS NULL OR C.fecha_fin>=CONVERT(date,SYSUTCDATETIME()))
-                ORDER BY E.razon_social
-                """,(rs,i)->new ConvenioAsociacionResponse(rs.getLong(1),rs.getString(2)),uotId));
+                ORDER BY E.razon_social,C.convenio_uot_organizacion_id
+                """,(rs,i)->new ConvenioAsociacionResponse(rs.getLong(1),rs.getString(2),rs.getLong(3)),uotId));
     }
 
     public AppResult<List<ConvenioModuloPermisoResponse>> availablePermissions(

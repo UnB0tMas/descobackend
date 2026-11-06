@@ -144,7 +144,7 @@ public class ProductPriceHistoryService {
     ) {
         if (identity == null || identity.usuarioId() == null
                 || contextUotId == null || productId == null || priceUotId == null
-                || initialPrice == null || salePrice == null || idempotencyKey == null) {
+                || salePrice == null || idempotencyKey == null) {
             return AppResult.error(
                     AppStatus.BAD_REQUEST,
                     "PRECIO_NO_REGISTRADO",

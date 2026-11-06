@@ -13,7 +13,7 @@ public final class PropertyCommands {
     public record GetProperty(Long predioId) {}
     public record Location(String distritoCodigo, Long centroPobladoId, String referencia, BigDecimal latitud, BigDecimal longitud, BigDecimal altitudM) {}
     public record Characteristics(BigDecimal areaTotalHa, BigDecimal areaCultivableHa, String tipoRiego, String fuenteAgua, String infraestructura, String observacion, LocalDate fechaDesde) {}
-    public record Owner(Long socioId, String tipoTitularidad, BigDecimal porcentaje) {}
+    public record Owner(Long personaId, Long socioId, String tipoTitularidad, BigDecimal porcentaje) {}
     public record CreateProperty(String codigo, String nombre, LocalDate fechaRegistro, Location ubicacion, Characteristics caracteristicas, List<Owner> titulares) {}
     public record UpdateProperty(Long predioId, String codigo, String nombre, LocalDate fechaTitularidad, Location ubicacion, Characteristics caracteristicas, List<Owner> titulares) {}
     public record RetireProperty(Long predioId, LocalDate fechaRetiro, String motivo) {}

@@ -37,6 +37,7 @@ public class ResourceExperienceService {
     private final SimpleJdbcCall updateProduct;
     private final SimpleJdbcCall deactivateProduct;
     private final SimpleJdbcCall reactivateProduct;
+    private final SimpleJdbcCall manageWarehouseProduct;
 
     public ResourceExperienceService(
             ResourceUseCase resources,
@@ -44,6 +45,10 @@ public class ResourceExperienceService {
     ) {
         this.resources = resources;
         this.jdbc = new JdbcTemplate(dataSource);
+        this.manageWarehouseProduct = base(dataSource, "logistica", "PA_AlmacenProducto_Upd_Configuracion",
+                in("nUsuarioId", Types.BIGINT), in("nSesionUsuarioId", Types.BIGINT), in("nUotId", Types.BIGINT),
+                in("nAlmacenId", Types.BIGINT), in("nProductoId", Types.BIGINT), in("cOperacion", Types.VARCHAR),
+                in("nStockMinimo", Types.DECIMAL), in("cMotivo", Types.NVARCHAR), in("gClaveIdempotencia", SQL_SERVER_GUID));
 
         this.suggestedCode = base(
                 dataSource,
@@ -82,12 +87,14 @@ public class ResourceExperienceService {
                         in("cUnidad", Types.VARCHAR),
                         in("cCategoria", Types.NVARCHAR),
                         in("bPermiteVenta", Types.BIT),
+                        in("nPrecioVenta", Types.DECIMAL), in("cMonedaVenta", Types.CHAR),
                         in("gClaveIdempotencia", SQL_SERVER_GUID),
                         new SqlOutParameter("nProductoId", Types.BIGINT),
                         new SqlOutParameter("bResultado", Types.BIT),
                         new SqlOutParameter("cMensaje", Types.NVARCHAR),
                         new SqlOutParameter("cCodigoRespuesta", Types.VARCHAR),
-                        new SqlOutParameter("nHttpRespuesta", Types.SMALLINT)
+                        new SqlOutParameter("nHttpRespuesta", Types.SMALLINT),
+                        in("bRequiereLote", Types.BIT), in("bControlaVencimiento", Types.BIT)
                 );
 
         this.updateProduct = base(
@@ -103,7 +110,8 @@ public class ResourceExperienceService {
                 in("cCategoria", Types.VARCHAR),
                 in("bRequiereLote", Types.BIT),
                 in("bControlaVencimiento", Types.BIT),
-                in("bPermiteVenta", Types.BIT)
+                in("bPermiteVenta", Types.BIT),
+                in("nPrecioVenta", Types.DECIMAL), in("cMonedaVenta", Types.CHAR)
         );
 
         this.deactivateProduct = base(
@@ -144,6 +152,7 @@ public class ResourceExperienceService {
                 in("nArchivoSustentoId", Types.BIGINT),
                 in("cDocumento", Types.NVARCHAR),
                 in("cObservacion", Types.NVARCHAR),
+                in("cMonedaVenta", Types.CHAR),
                 new SqlOutParameter("nMovimientoId", Types.BIGINT),
                 new SqlOutParameter("nStockActual", Types.DECIMAL),
                 new SqlOutParameter("nStockMinimoFinal", Types.DECIMAL)
@@ -227,6 +236,7 @@ public class ResourceExperienceService {
                 command.providerPersonId(),
                 command.providerCompanyId(),
                 command.observation(),
+                command.vehicle(),
                 command.idempotencyKey()
         );
 
@@ -236,7 +246,8 @@ public class ResourceExperienceService {
     public AppResult<Long> createProduct(
             SessionIdentity identity,
             ResourceCommands.CreateProduct command,
-            boolean allowsSale
+            boolean allowsSale, BigDecimal salePrice, String saleCurrency,
+            boolean requiresLot, boolean controlsExpiration
     ) {
         AppResult<String> codeResult = codeOrSuggested(
                 identity,
@@ -258,11 +269,15 @@ public class ResourceExperienceService {
                             .addValue("nUsuarioId", identity.usuarioId())
                             .addValue("nUotId", command.contextUotId())
                             .addValue("cCodigo", codeResult.datos())
+                            .addValue("bRequiereLote", requiresLot)
+                            .addValue("bControlaVencimiento", controlsExpiration)
                             .addValue("cNombre", trimToNull(command.name()))
                             .addValue("cDescripcion", trimToNull(command.description()))
                             .addValue("cUnidad", trimToNull(command.unit()))
                             .addValue("cCategoria", trimToNull(command.category()))
                             .addValue("bPermiteVenta", allowsSale)
+                            .addValue("nPrecioVenta", allowsSale ? salePrice : null)
+                            .addValue("cMonedaVenta", allowsSale && saleCurrency != null ? saleCurrency.toUpperCase(Locale.ROOT) : null)
                             .addValue(
                                     "gClaveIdempotencia",
                                     command.idempotencyKey() == null ? null : command.idempotencyKey().toString()
@@ -348,7 +363,7 @@ public class ResourceExperienceService {
             String category,
             boolean requiresLot,
             boolean controlsExpiration,
-            boolean allowsSale
+            boolean allowsSale, BigDecimal salePrice, String saleCurrency
     ) {
         return executeProductWrite(
                 updateProduct,
@@ -362,7 +377,9 @@ public class ResourceExperienceService {
                         .addValue("cCategoria", trimToNull(category))
                         .addValue("bRequiereLote", requiresLot)
                         .addValue("bControlaVencimiento", controlsExpiration)
-                        .addValue("bPermiteVenta", allowsSale),
+                        .addValue("bPermiteVenta", allowsSale)
+                            .addValue("nPrecioVenta", allowsSale ? salePrice : null)
+                            .addValue("cMonedaVenta", allowsSale && saleCurrency != null ? saleCurrency.toUpperCase(Locale.ROOT) : null),
                 "PRODUCTO_ACTUALIZADO",
                 "Producto actualizado correctamente."
         );
@@ -428,6 +445,20 @@ public class ResourceExperienceService {
         }
     }
 
+    public AppResult<Void> manageWarehouseProduct(SessionIdentity identity, Long uotId, Long warehouseId,
+            Long productId, String operation, BigDecimal minimumStock, String reason, UUID key) {
+        MapSqlParameterSource parameters = sessionParameters(identity);
+        if (parameters == null) return sessionUnavailable();
+        try {
+            Map<String, Object> output = manageWarehouseProduct.execute(parameters
+                    .addValue("nUotId", uotId).addValue("nAlmacenId", warehouseId).addValue("nProductoId", productId)
+                    .addValue("cOperacion", operation).addValue("nStockMinimo", minimumStock)
+                    .addValue("cMotivo", trimToNull(reason)).addValue("gClaveIdempotencia", key.toString()));
+            if (!ok(output)) return databaseError(output);
+            return AppResult.ok(responseCode(output, "ALMACEN_PRODUCTO_ACTUALIZADO"), message(output, "Configuración actualizada."), null);
+        } catch (DataAccessException exception) { return unavailable(); }
+    }
+
     public AppResult<ResourceModels.WarehouseProductConfiguration> configureWarehouseProduct(
             SessionIdentity identity,
             Long uotId,
@@ -442,7 +473,7 @@ public class ResourceExperienceService {
             LocalDate expirationDate,
             UUID idempotencyKey,
             Long supportFileId,
-            String observation
+            String observation, String saleCurrency
     ) {
         MapSqlParameterSource parameters = sessionParameters(identity);
         if (parameters == null) {
@@ -459,6 +490,7 @@ public class ResourceExperienceService {
                             .addValue("nStockMinimo", minimumStock)
                             .addValue("nCostoUnitario", unitCost)
                             .addValue("nPrecioVenta", salePrice)
+                            .addValue("cMonedaVenta", normalizeCurrency(saleCurrency))
                             .addValue("cMoneda", normalizeCurrency(currency))
                             .addValue("cLote", trimToNull(lot))
                             .addValue("dFechaVencimiento", expirationDate)

@@ -2,6 +2,7 @@ package com.franco.desco.infrastructure.mail;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.franco.desco.infrastructure.config.SmtpMode;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.Ordered;
@@ -21,17 +22,24 @@ public final class MailStartupDiagnostics
 
     private final JavaMailSender mailSender;
     private final Environment environment;
+    private final SmtpMode smtpMode;
 
     public MailStartupDiagnostics(
             JavaMailSender mailSender,
-            Environment environment
+            Environment environment,
+            SmtpMode smtpMode
     ) {
         this.mailSender = mailSender;
         this.environment = environment;
+        this.smtpMode = smtpMode;
     }
 
     @Override
     public void run(ApplicationArguments args) {
+        if (!smtpMode.enabled()) {
+            log.info("[MAIL] SMTP deshabilitado por configuración; test de conexión omitido.");
+            return;
+        }
         String configuredHost =
                 value(environment.getProperty("spring.mail.host"));
 

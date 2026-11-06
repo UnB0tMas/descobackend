@@ -2,6 +2,8 @@ package com.franco.desco.adapter.in.web.inventory;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -44,10 +46,11 @@ public final class InventoryRequests {
 
     @Schema(name = "InventoryVehicleRegisterRequest")
     public record RegisterVehicle(
-            @NotBlank @Size(max = 12) String placa,
+            @Size(max = 12) @Pattern(regexp = "\\s*[A-Za-z0-9-]*\\s*") String placa,
             @Schema(description = "Código del catálogo TIPO_VEHICULO.")
             @NotBlank @Size(max = 30) String tipoVehiculo,
-            @NotNull @PositiveOrZero BigDecimal kilometrajeKm
+            @PositiveOrZero @Digits(integer = 11, fraction = 1) BigDecimal kilometrajeKm,
+            @Size(max = 50) String color
     ) {
     }
 

@@ -58,6 +58,16 @@ public class LogisticsOperationsController {
                 new LogisticsOperationsService.Policy(body.uotId(),body.productoId(),body.permiteVenta(),body.permiteUsoInterno())),request);
     }
 
+    @GetMapping("/transferencias/productos")
+    @PreAuthorize("@permissionGuard.has(authentication,'ALMACENES_LISTAR')")
+    @Operation(operationId="almacenesProductosTransferibles",summary="Productos de origen y motivos que impiden transferirlos")
+    public ResponseEntity<ApiResponse<List<Map<String,Object>>>> transferProducts(
+            @RequestParam @Positive Long almacenOrigenId,@RequestParam @Positive Long almacenDestinoId,
+            @Parameter(hidden=true) JwtAuthenticationToken authentication,
+            @Parameter(hidden=true) HttpServletRequest request) {
+        return responses.from(service.transferProducts(identities.resolve(authentication),almacenOrigenId,almacenDestinoId),request);
+    }
+
     @PostMapping("/transferencias")
     @IdempotentOperation
     @PreAuthorize("@permissionGuard.has(authentication,'ALMACENES_MOVIMIENTO')")

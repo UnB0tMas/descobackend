@@ -48,7 +48,10 @@ public class LocalDocumentService {
         if (file == null || file.isEmpty()) {
             return bad("Seleccione un archivo para cargar.");
         }
-        if (!uot.hasPermission(identity, uotId, "ARCHIVOS_CREAR")) return forbidden("No tiene permiso para registrar archivos en la UOT seleccionada.");
+        // Los técnicos pueden adjuntar evidencia a su salida aunque no administren el archivo general.
+        boolean salida = "SALIDA".equalsIgnoreCase(targetType);
+        if (!uot.hasPermission(identity, uotId, salida ? "SALIDAS_EDITAR" : "ARCHIVOS_CREAR"))
+            return forbidden("No tiene permiso para registrar este documento.");
         String normalizedCategory;
         try {
             normalizedCategory = normalizeCategory(category);
@@ -56,7 +59,7 @@ public class LocalDocumentService {
             return AppResult.error(AppStatus.BAD_REQUEST, "ARCHIVO_INVALIDO", exception.getMessage());
         }
         String normalizedTarget = targetType == null || targetType.isBlank() ? "NINGUNO" : targetType.trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("NINGUNO", "BIEN", "PRODUCTO").contains(normalizedTarget)) return bad("El tipo de vínculo del archivo no es válido.");
+        if (!Set.of("NINGUNO", "BIEN", "PRODUCTO", "SALIDA").contains(normalizedTarget)) return bad("El tipo de vínculo del archivo no es válido.");
         if (!"NINGUNO".equals(normalizedTarget) && targetId == null) return bad("Seleccione el registro al que pertenece el archivo.");
 
         String key = storage.deterministicKey(
@@ -146,8 +149,11 @@ public class LocalDocumentService {
                       AND EXISTS(SELECT 1 FROM seg.UsuarioUOT UU WHERE UU.usuario_id=? AND UU.uot_id=A.uot_id AND UU.estado=1 AND UU.fecha_hasta IS NULL)
                       AND seg.FN_Usuario_TienePermisoUOT(?,A.uot_id,'ARCHIVOS_LISTAR')=1
                       AND (? IS NULL OR A.uot_id=?)
+                      AND (A.usuario_id=? OR NOT EXISTS(
+                        SELECT 1 FROM archivo.ArchivoVinculo AV
+                        WHERE AV.archivo_id=A.archivo_id AND AV.salida_campo_id IS NOT NULL AND AV.estado=1))
                     ORDER BY A.fecha_carga DESC,A.archivo_id DESC
-                    """, (rs, rowNum) -> mapFile(rs), identity.usuarioId(), identity.usuarioId(), filterUot, filterUot);
+                    """, (rs, rowNum) -> mapFile(rs), identity.usuarioId(), identity.usuarioId(), filterUot, filterUot, identity.usuarioId());
             return AppResult.ok("ARCHIVOS_LOCALES_LISTADOS", "Archivos consultados correctamente.", values);
         } catch (DataAccessException exception) {
             return AppResult.error(AppStatus.SERVICE_UNAVAILABLE, "ARCHIVOS_LOCALES_NO_LISTADOS", "No se pudieron consultar los archivos.");
@@ -168,6 +174,23 @@ public class LocalDocumentService {
     }
 
     private boolean canViewContent(SessionIdentity identity, LocalDocumentModels.FileInfo info) {
+        Integer salida = jdbc.queryForObject("""
+            SELECT COUNT(*) FROM archivo.ArchivoVinculo
+            WHERE archivo_id=? AND salida_campo_id IS NOT NULL AND estado=1
+            """, Integer.class, info.fileId());
+        if (salida != null && salida > 0) {
+            Integer allowed = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM archivo.ArchivoVinculo AV
+                JOIN campo.SalidaE2 E ON E.salida_campo_id=AV.salida_campo_id
+                JOIN seg.Usuario U ON U.usuario_id=?
+                WHERE AV.archivo_id=? AND AV.estado=1 AND E.uot_id=?
+                  AND seg.FN_Usuario_TienePermisoUOT(? , E.uot_id,'SALIDAS_VER')=1
+                  AND (E.solicitante_empleado_id=U.persona_id OR
+                       seg.FN_Usuario_TienePermisoUOT(?,E.uot_id,'SALIDAS_CONFIRMAR')=1)
+                """, Integer.class, identity.usuarioId(),info.fileId(),info.uotId(),
+                identity.usuarioId(),identity.usuarioId());
+            return allowed != null && allowed > 0;
+        }
         if (uot.hasPermission(identity, info.uotId(), "ARCHIVOS_VER")) return true;
 
         Integer allowed = jdbc.queryForObject(
@@ -223,6 +246,17 @@ public class LocalDocumentService {
 
     private void link(SessionIdentity identity, Long uotId, Long fileId, String mime, String type, Long targetId, boolean principal) {
         if ("NINGUNO".equals(type)) return;
+        if ("SALIDA".equals(type)) {
+            Integer owner = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM campo.SalidaE2 E
+                JOIN seg.Usuario U ON U.usuario_id=?
+                WHERE E.salida_campo_id=? AND E.uot_id=? AND E.solicitante_empleado_id=U.persona_id
+                  AND E.estado NOT IN('BORRADOR','ELIMINADA','CANCELADA')
+                """, Integer.class, identity.usuarioId(),targetId,uotId);
+            if(owner==null||owner==0)throw new StorageFailure("Solo el responsable puede adjuntar archivos a su solicitud confirmada.");
+            jdbc.update("INSERT archivo.ArchivoVinculo(archivo_id,salida_campo_id,estado) VALUES(?,?,1)",fileId,targetId);
+            return;
+        }
         if (!mime.startsWith("image/")) throw new StorageFailure("Para vincular una imagen seleccione un archivo de imagen válido.");
         if ("BIEN".equals(type)) {
             if (!uot.hasPermission(identity, uotId, "INVENTARIO_EDITAR")) throw new StorageFailure("No tiene permiso para modificar imágenes del bien.");

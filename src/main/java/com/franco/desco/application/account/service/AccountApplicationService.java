@@ -20,19 +20,22 @@ public final class AccountApplicationService implements AccountUseCase {
     private final OtpPort otp;
     private final SecurityMailPort mail;
     private final SecurityNotificationPort notifications;
+    private final boolean smtpEnabled;
 
     public AccountApplicationService(
             AccountPersistencePort persistence,
             PasswordHashPort passwordHash,
             OtpPort otp,
             SecurityMailPort mail,
-            SecurityNotificationPort notifications
+            SecurityNotificationPort notifications,
+            boolean smtpEnabled
     ) {
         this.persistence = persistence;
         this.passwordHash = passwordHash;
         this.otp = otp;
         this.mail = mail;
         this.notifications = notifications;
+        this.smtpEnabled = smtpEnabled;
     }
 
     @Override
@@ -117,6 +120,10 @@ public final class AccountApplicationService implements AccountUseCase {
 
     @Override
     public AppResult<Void> requestEmailChange(RequestEmailChange command, SessionIdentity identity, RequestMetadata metadata) {
+        if (!smtpEnabled) {
+            return AppResult.error(AppStatus.SERVICE_UNAVAILABLE,
+                    "CORREO_DESHABILITADO", "No se puede cambiar el correo mientras SMTP esté deshabilitado.");
+        }
         if (command.nuevoCorreo() == null || command.nuevoCorreo().isBlank()) {
             return AppResult.error(AppStatus.BAD_REQUEST, "CORREO_NO_VALIDO", "Ingrese el nuevo correo de seguridad.");
         }

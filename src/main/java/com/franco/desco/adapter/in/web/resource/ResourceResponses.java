@@ -63,6 +63,7 @@ public final class ResourceResponses {
             String placa,
             String tipoVehiculo,
             BigDecimal kilometrajeKm,
+            String color,
             Long archivoPrincipalId,
             String imagenPrincipalUrl,
             int incidentesAbiertos,
@@ -236,7 +237,9 @@ public final class ResourceResponses {
             BigDecimal stockReservado,
             BigDecimal stockDisponible,
             BigDecimal stockMinimo,
-            LocalDateTime fechaActualizacion
+            LocalDateTime fechaActualizacion,
+            boolean estado,
+            boolean tieneHistorial
     ) {
     }
 
