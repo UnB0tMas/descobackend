@@ -63,13 +63,19 @@ public class LocalDocumentController {
             @RequestParam(defaultValue = "NINGUNO") String vinculoTipo,
             @RequestParam(required = false) @Positive Long vinculoId,
             @RequestParam(defaultValue = "false") boolean principal,
+            @RequestParam(required = false) @Size(max = 40) String tipoEvidencia,
+            @RequestParam(defaultValue = "CARGA") String origenCaptura,
+            @RequestParam(required = false) java.time.Instant fechaCaptura,
+            @RequestParam(required = false) Double latitudCaptura,
+            @RequestParam(required = false) Double longitudCaptura,
             @Parameter(hidden = true) JwtAuthenticationToken authentication,
             @Parameter(hidden = true) HttpServletRequest request
     ) {
         return responses.from(
                 service.upload(
                         identities.resolve(authentication), uotId, archivo, categoria, descripcion,
-                        vinculoTipo, vinculoId, principal, idempotency.required(request)
+                        vinculoTipo, vinculoId, principal, idempotency.required(request),
+                        tipoEvidencia==null?null:new LocalDocumentService.EvidenceMetadata(tipoEvidencia,origenCaptura,fechaCaptura,latitudCaptura,longitudCaptura)
                 ),
                 request,
                 mapper::response

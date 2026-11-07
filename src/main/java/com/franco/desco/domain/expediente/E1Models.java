@@ -16,7 +16,7 @@ public final class E1Models {
     public record Predios(List<PredioResumen> items) {}
     public record Catalogo(Integer id, String nombre) {}
     public record Variedad(Long id, Integer padreId, String nombre) {}
-    public record Catalogos(List<Catalogo> cultivos, List<Variedad> variedades, List<Catalogo> especies) {}
+    public record Catalogos(List<Catalogo> cultivos, List<Variedad> variedades, List<Catalogo> especies) { public Catalogos { cultivos=emptyIfNull(cultivos); variedades=emptyIfNull(variedades); especies=emptyIfNull(especies); } }
     public record Titular(Long personaId, Long socioId, String numeroDocumento, String nombreCompleto,
                           String tipoTitularidad, BigDecimal porcentaje, String rolTitularidad) {}
     public record Cultivo(Long id, String cultivo, String variedad, String parcela, LocalDate fechaInicio, LocalDate fechaFin) {}
@@ -28,6 +28,7 @@ public final class E1Models {
     public record Expediente(Long predioId, String codigo, String nombre, String distritoCodigo, String referencia,
                              BigDecimal latitud, BigDecimal longitud, BigDecimal areaTotalHa, BigDecimal areaCultivableHa,
                              String tipoRiego, boolean fichaCompleta, List<Titular> titulares, List<Cultivo> cultivos,
-                             List<Crianza> crianzas, List<Actuacion> historial, List<Censo> censos, List<Conteo> conteos) {}
+                             List<Crianza> crianzas, List<Actuacion> historial, List<Censo> censos, List<Conteo> conteos) { public Expediente { titulares=emptyIfNull(titulares); cultivos=emptyIfNull(cultivos); crianzas=emptyIfNull(crianzas); historial=emptyIfNull(historial); censos=emptyIfNull(censos); conteos=emptyIfNull(conteos); } }
+    private static <T> List<T> emptyIfNull(List<T> values) { return values == null ? List.of() : List.copyOf(values); }
     public record Identificador(Long id) {}
 }

@@ -70,7 +70,7 @@ class OpenApiNewModulesContractTest {
             }
         }
 
-        assertEquals(35, endpointCount, "Cambió la superficie de endpoints nuevos; revise el contrato OpenAPI.");
+        assertEquals(51, endpointCount, "Cambió la superficie de endpoints nuevos; revise el contrato OpenAPI.");
     }
 
     @Test

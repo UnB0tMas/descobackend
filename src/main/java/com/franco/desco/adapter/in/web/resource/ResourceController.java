@@ -287,7 +287,7 @@ public class ResourceController {
                         new ResourceCommands.ReportIncident(
                                 id,
                                 body.tipo(),
-                                body.fechaHora(),
+                                java.time.LocalDateTime.ofInstant(body.fechaHora(), java.time.ZoneOffset.UTC),
                                 body.descripcion(),
                                 body.costoEstimado(),
                                 idempotency.required(request)

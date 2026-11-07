@@ -80,7 +80,7 @@ public final class SqlValues {
 
     public static Object normalizeJdbcValue(Object value) {
         if (value instanceof Timestamp timestamp) {
-            return timestamp.toInstant();
+            return timestamp.toLocalDateTime().toInstant(java.time.ZoneOffset.UTC);
         }
         if (value instanceof Date date) {
             return date.toLocalDate();

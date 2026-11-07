@@ -105,7 +105,7 @@ public final class ResourceRequests {
             @NotBlank
             @Pattern(regexp = "AVERIA|ACCIDENTE|PERDIDA|ROBO|MANTENIMIENTO|OTRO")
             String tipo,
-            @NotNull @PastOrPresent LocalDateTime fechaHora,
+            @NotNull @PastOrPresent java.time.Instant fechaHora,
             @NotBlank @Size(max = 700) String descripcion,
             @PositiveOrZero BigDecimal costoEstimado
     ) {

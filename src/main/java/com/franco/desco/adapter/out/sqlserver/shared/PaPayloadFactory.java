@@ -43,6 +43,7 @@ public final class PaPayloadFactory {
                     "caso",
                     "tratamiento",
                     "seguimiento",
+                    "produccion",
                     "campania",
                     "participacion",
                     "operativo",
@@ -169,7 +170,8 @@ public final class PaPayloadFactory {
          * único Command de aplicación por acción.
          */
         for (String alias : BUSINESS_ALIASES) {
-            root.putIfAbsent(alias, data);
+            // El alias SQL siempre es un objeto; los campos homónimos siguen dentro de data.
+            root.put(alias, data);
         }
 
         return write(root);

@@ -136,7 +136,7 @@ public final class LogisticsOperationsService {
                             while(result.next()) {
                                 Map<String,Object> row=new LinkedHashMap<>();
                                 for(int col=1;col<=meta.getColumnCount();col++)
-                                    row.put(meta.getColumnLabel(col),result.getObject(col));
+                                    row.put(meta.getColumnLabel(col),readValue(result,col,meta.getColumnLabel(col)));
                                 values.add(row);
                             }
                         }
@@ -147,6 +147,18 @@ public final class LogisticsOperationsService {
             Long id=returnId?(Long)statement.getObject(idIndex):null;
             return new Outcome(statement.getBoolean(successIndex),statement.getString(messageIndex),id,List.copyOf(values));
         }
+    }
+
+    private Object readValue(ResultSet result, int column, String label) throws SQLException {
+        Object value = result.getObject(column);
+        if (value instanceof Timestamp time) {
+            // The agenda uses local Lima wall time; audit/event columns use UTC.
+            boolean agenda = label.equalsIgnoreCase("fechaInicio") || label.equalsIgnoreCase("fechaFin")
+                    || label.equalsIgnoreCase("fecha_inicio") || label.equalsIgnoreCase("fecha_fin");
+            return agenda ? time.toLocalDateTime().atZone(java.time.ZoneId.of("America/Lima")).toInstant()
+                    : time.toLocalDateTime().toInstant(java.time.ZoneOffset.UTC);
+        }
+        return value;
     }
 
     private void set(CallableStatement statement,int index,Object value) throws SQLException {

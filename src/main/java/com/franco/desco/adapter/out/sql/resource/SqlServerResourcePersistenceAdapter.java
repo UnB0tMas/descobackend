@@ -94,38 +94,31 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
         if (!uot.hasPermission(identity, command.uotId(), "INVENTARIO_CREAR")) return PersistenceResult.error("No tiene permiso para registrar recursos en esa UOT.");
         if (command.idempotencyKey() == null) return PersistenceResult.error("La clave de idempotencia es obligatoria.");
         if (command.providerPersonId() != null && command.providerCompanyId() != null) return PersistenceResult.error("Seleccione un solo proveedor.");
-        try {
-            Long id = transaction.execute(status -> {
-                acquireLock("DESCO:BIEN_UOT_CREAR:" + command.idempotencyKey());
-                Long existing = completedIdempotency(identity.usuarioId(), command.idempotencyKey(), "BIEN_UOT_CREAR");
-                if (existing != null) return existing;
-                startIdempotency(identity.usuarioId(), command.idempotencyKey(), "BIEN_UOT_CREAR");
-
-                Long companyId = compatibilityCompany(command.uotId());
-                if (companyId == null) throw new BusinessFailure("No existe una organización DESCO de compatibilidad para registrar el bien.");
-                String code = required(command.patrimonialCode(), "El código patrimonial es obligatorio.").toUpperCase(Locale.ROOT);
-                String name = required(command.name(), "El nombre del bien es obligatorio.");
-                Integer duplicated = jdbc.queryForObject("SELECT COUNT(*) FROM logistica.BienInventario WHERE codigo_patrimonial=?", Integer.class, code);
-                if (duplicated != null && duplicated > 0) throw new BusinessFailure("El código patrimonial ya está registrado.");
-
-                Long assetId = jdbc.queryForObject("""
-                        INSERT logistica.BienInventario(empresa_id,uot_id,tipo_bien_id,codigo_patrimonial,nombre,marca,modelo,serie,estado_bien,estado,
-                          fecha_adquisicion,monto_adquisicion,moneda_adquisicion,proveedor_persona_id,proveedor_empresa_id,observacion)
-                        OUTPUT INSERTED.bien_inventario_id
-                        VALUES(?,?,?,?,?,?,?,?, 'DISPONIBLE',1,?,?,?,?,?,?)
-                        """, Long.class, companyId, command.uotId(), command.assetTypeId(), code, name, trim(command.brand()), trim(command.model()), trim(command.serial()),
-                        command.acquisitionDate(), command.acquisitionAmount(), currency(command.currency()), command.providerPersonId(), command.providerCompanyId(), trim(command.observation()));
-                if (assetId == null) throw new BusinessFailure("No se pudo obtener el recurso registrado.");
-                jdbc.update("INSERT logistica.BienEstadoHistorial(bien_inventario_id,estado_bien,fecha_desde,motivo,usuario_id,estado) VALUES(?,'DISPONIBLE',SYSUTCDATETIME(),N'Registro inicial.',?,1)", assetId, identity.usuarioId());
-                finishIdempotency(identity.usuarioId(), command.idempotencyKey(), "BIEN_UOT_CREAR", assetId);
-                return assetId;
-            });
-            return PersistenceResult.ok("Recurso registrado correctamente.", id);
-        } catch (BusinessFailure e) {
-            return PersistenceResult.error(e.getMessage());
-        } catch (DataAccessException e) {
-            return PersistenceResult.error("No se pudo registrar el recurso. Revise los datos e intente nuevamente.");
-        }
+        return idempotency.executeLong(identity.usuarioId(), command.idempotencyKey(),
+                "BIEN_UOT_CREAR", "logistica", "BienInventario", () -> {
+            Long companyId = compatibilityCompany(command.uotId());
+            if (companyId == null) return PersistenceResult.error("No existe una organización DESCO para registrar el bien.");
+            validateVehicleType(command.assetTypeId(), command.vehicle());
+            String code = required(command.patrimonialCode(), "El código patrimonial es obligatorio.").toUpperCase(Locale.ROOT);
+            Integer duplicated = jdbc.queryForObject("SELECT COUNT(*) FROM logistica.BienInventario WITH (UPDLOCK,HOLDLOCK) WHERE codigo_patrimonial=?", Integer.class, code);
+            if (duplicated != null && duplicated > 0) return PersistenceResult.error("El código patrimonial ya está registrado.");
+            // The plate guard requires the vehicle row before a vehicle can become available.
+            // saveVehicle completes the transition atomically after inserting that row.
+            String initialState = command.vehicle() != null ? "PENDIENTE_PLACA" : "DISPONIBLE";
+            Long assetId = jdbc.queryForObject("""
+                    DECLARE @creado TABLE (id BIGINT);
+                    INSERT logistica.BienInventario(empresa_id,uot_id,tipo_bien_id,codigo_patrimonial,nombre,marca,modelo,serie,estado_bien,estado,
+                      fecha_adquisicion,monto_adquisicion,moneda_adquisicion,proveedor_persona_id,proveedor_empresa_id,observacion)
+                    OUTPUT INSERTED.bien_inventario_id INTO @creado VALUES(?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?);
+                    SELECT id FROM @creado;
+                    """, Long.class, companyId, command.uotId(), command.assetTypeId(), code,
+                    required(command.name(), "El nombre del bien es obligatorio."), trim(command.brand()), trim(command.model()), trim(command.serial()), initialState,
+                    command.acquisitionDate(), command.acquisitionAmount(), currency(command.currency()), command.providerPersonId(), command.providerCompanyId(), trim(command.observation()));
+            if (assetId == null) throw new BusinessFailure("No se pudo obtener el recurso registrado.");
+            jdbc.update("INSERT logistica.BienEstadoHistorial(bien_inventario_id,estado_bien,fecha_desde,motivo,usuario_id,estado) VALUES(?,?,SYSUTCDATETIME(),N'Registro inicial.',?,1)", assetId, initialState, identity.usuarioId());
+            if (command.vehicle() != null) saveVehicle(identity, assetId, command.vehicle());
+            return PersistenceResult.ok("Recurso registrado correctamente.", assetId);
+        });
     }
 
     @Override
@@ -135,15 +128,40 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
         if (!uot.hasPermission(identity, assetUot, "INVENTARIO_EDITAR")) return PersistenceResult.error("No tiene permiso para modificar el recurso.");
         if (command.providerPersonId() != null && command.providerCompanyId() != null) return PersistenceResult.error("Seleccione un solo proveedor.");
         try {
-            int changed = jdbc.update("""
-                    UPDATE logistica.BienInventario SET tipo_bien_id=?,nombre=?,marca=?,modelo=?,serie=?,fecha_adquisicion=?,monto_adquisicion=?,
-                    moneda_adquisicion=?,proveedor_persona_id=?,proveedor_empresa_id=?,observacion=? WHERE bien_inventario_id=? AND estado=1
-                    """, command.assetTypeId(), required(command.name(), "El nombre del bien es obligatorio."), trim(command.brand()), trim(command.model()), trim(command.serial()),
-                    command.acquisitionDate(), command.acquisitionAmount(), currency(command.currency()), command.providerPersonId(), command.providerCompanyId(), trim(command.observation()), command.assetId());
-            return changed == 1 ? PersistenceResult.ok("Recurso actualizado correctamente.", null) : PersistenceResult.error("El recurso no está disponible.");
+            return transaction.execute(status -> {
+                validateVehicleType(command.assetTypeId(), command.vehicle());
+                int changed = jdbc.update("""
+                        UPDATE logistica.BienInventario SET tipo_bien_id=?,nombre=?,marca=?,modelo=?,serie=?,fecha_adquisicion=?,monto_adquisicion=?,
+                        moneda_adquisicion=?,proveedor_persona_id=?,proveedor_empresa_id=?,observacion=? WHERE bien_inventario_id=? AND estado=1
+                        """, command.assetTypeId(), required(command.name(), "El nombre del bien es obligatorio."), trim(command.brand()), trim(command.model()), trim(command.serial()),
+                        command.acquisitionDate(), command.acquisitionAmount(), currency(command.currency()), command.providerPersonId(), command.providerCompanyId(), trim(command.observation()), command.assetId());
+                if (changed != 1) return PersistenceResult.error("El recurso no está disponible.");
+                if (command.vehicle() != null) saveVehicle(identity, command.assetId(), command.vehicle());
+                return PersistenceResult.ok("Recurso actualizado correctamente.", null);
+            });
         } catch (RuntimeException e) {
             return PersistenceResult.error(e instanceof BusinessFailure ? e.getMessage() : "No se pudo actualizar el recurso.");
         }
+    }
+
+    private void validateVehicleType(Integer typeId, ResourceCommands.VehicleData vehicle) {
+        String name = jdbc.queryForObject("SELECT nombre FROM logistica.TipoBien WHERE tipo_bien_id=? AND estado=1", String.class, typeId);
+        boolean vehicleType = name != null && java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").trim().equalsIgnoreCase("VEHICULO");
+        if (vehicleType && vehicle == null) throw new BusinessFailure("Complete los datos del vehículo.");
+        if (!vehicleType && vehicle != null) throw new BusinessFailure("Los datos vehiculares requieren el tipo de bien Vehículo.");
+    }
+
+    private void saveVehicle(SessionIdentity identity, Long assetId, ResourceCommands.VehicleData vehicle) {
+        Map<String,Object> result = procedures.call("logistica", "PA_Vehiculo_Upd_DatosPatrimoniales", map(
+                "nUsuarioId",identity.usuarioId(),"nBienId",assetId,"cPlaca",trim(vehicle.plate()),
+                "cTipo",vehicle.type(),"nKilometraje",vehicle.mileage(),"cColor",trim(vehicle.color())),
+                new SqlParameter("nUsuarioId",Types.BIGINT),new SqlParameter("nBienId",Types.BIGINT),
+                new SqlParameter("cPlaca",Types.VARCHAR),new SqlParameter("cTipo",Types.VARCHAR),
+                new SqlParameter("nKilometraje",Types.DECIMAL),
+                new SqlOutParameter("bResultado",Types.BIT),new SqlOutParameter("cMensaje",Types.NVARCHAR),
+                new SqlParameter("cColor",Types.NVARCHAR));
+        if (!SqlProcedureExecutor.success(result)) throw new BusinessFailure(SqlProcedureExecutor.message(result,"No se pudieron guardar los datos del vehículo."));
     }
 
     @Override
@@ -343,18 +361,6 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
         return ids.isEmpty()||ids.getFirst()==0?null:ids.getFirst();
     }
 
-    private Long completedIdempotency(Long user, UUID key, String scope){
-        List<String> ids=jdbc.query("SELECT identificador_resultado FROM auditoria.OperacionIdempotente WHERE clave_idempotencia=? AND usuario_id=? AND ambito=? AND estado=1 AND estado_operacion='COMPLETADA'",(rs,n)->rs.getString(1),key,user,scope);
-        if(ids.isEmpty()||ids.getFirst()==null)return null; try{return Long.valueOf(ids.getFirst());}catch(NumberFormatException e){return null;}
-    }
-    private void startIdempotency(Long user,UUID key,String scope){
-        Integer count=jdbc.queryForObject("SELECT COUNT(*) FROM auditoria.OperacionIdempotente WHERE clave_idempotencia=?",Integer.class,key);
-        if(count!=null&&count>0)throw new BusinessFailure("La clave de idempotencia ya fue utilizada por otra operación.");
-        jdbc.update("INSERT auditoria.OperacionIdempotente(usuario_id,clave_idempotencia,ambito,fecha_inicio,estado_operacion,fecha_expiracion,estado) VALUES(?,?,?,SYSUTCDATETIME(),'EN_PROCESO',DATEADD(day,7,SYSUTCDATETIME()),1)",user,key,scope);
-    }
-    private void finishIdempotency(Long user,UUID key,String scope,Long id){jdbc.update("UPDATE auditoria.OperacionIdempotente SET estado_operacion='COMPLETADA',fecha_fin=SYSUTCDATETIME(),esquema_entidad='logistica',nombre_entidad='BienInventario',identificador_resultado=?,codigo_resultado='BIEN_CREADO',mensaje_resultado=N'Recurso registrado correctamente.' WHERE usuario_id=? AND clave_idempotencia=? AND ambito=?",String.valueOf(id),user,key,scope);}
-    private void acquireLock(String resource){Integer r=jdbc.queryForObject("DECLARE @r int; EXEC @r=sp_getapplock @Resource=?,@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=10000; SELECT @r;",Integer.class,resource);if(r==null||r<0)throw new BusinessFailure("No se pudo reservar la operación. Intente nuevamente.");}
-
     private static ResourceModels.Asset assetRow(java.sql.ResultSet rs)throws java.sql.SQLException{return new ResourceModels.Asset(rs.getLong("bien_inventario_id"),rs.getLong("uot_id"),rs.getString("uot_codigo"),rs.getString("uot_nombre"),rs.getInt("tipo_bien_id"),rs.getString("tipo_bien"),rs.getString("codigo_patrimonial"),rs.getString("nombre"),rs.getString("marca"),rs.getString("modelo"),rs.getString("serie"),rs.getString("estado_bien"),localDate(rs,"fecha_adquisicion"),rs.getBigDecimal("monto_adquisicion"),rs.getString("moneda_adquisicion"),nullableLong(rs,"proveedor_persona_id"),nullableLong(rs,"proveedor_empresa_id"),rs.getString("observacion"),nullableLong(rs,"imagen_id"),rs.getInt("incidentes_abiertos"),rs.getBoolean("estado"));}
     private static PersistenceResult<Long> idResult(Map<String,Object> out,String key,String fallback){if(!SqlProcedureExecutor.success(out))return PersistenceResult.error(SqlProcedureExecutor.message(out,fallback));return PersistenceResult.ok(SqlProcedureExecutor.message(out,"Registro creado correctamente."),SqlProcedureExecutor.longValue(out,key));}
     private static PersistenceResult<Void> voidResult(Map<String,Object> out,String fallback){if(!SqlProcedureExecutor.success(out))return PersistenceResult.error(SqlProcedureExecutor.message(out,fallback));return PersistenceResult.ok(SqlProcedureExecutor.message(out,"Acción realizada."),null);}
@@ -368,5 +374,7 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
     private static String required(String v,String m){if(v==null||v.isBlank())throw new BusinessFailure(m);return v.trim();}
     private static String currency(String v){return v==null||v.isBlank()?"PEN":v.trim().toUpperCase(Locale.ROOT);}
     private static final Long INVALID_SCOPE=Long.MIN_VALUE;
-    private static final class BusinessFailure extends RuntimeException{private BusinessFailure(String message){super(message);}}
+    private static final class BusinessFailure extends com.franco.desco.application.shared.BusinessRuleViolation {
+        private BusinessFailure(String message) { super(message); }
+    }
 }

@@ -25,7 +25,14 @@ public final class CensusSqlServerAdapter
 
     @Override
     public PersistenceResult<PageResult<CensusModels.Summary>> list(ListCensuses c,SessionIdentity i,RequestMetadata m) {
-        return page("prod.PA_CensoPlantas_Sel_Historial", c, i, m, CensusModels.Summary.class);
+        var result = page("prod.PA_CensoPlantas_Sel_Historial", c, i, m, CensusModels.Summary.class);
+        if (!result.exitoso() || result.datos() == null || !result.datos().items().isEmpty() || c.page().pagina() <= 1) return result;
+        var p = c.page();
+        var first = page("prod.PA_CensoPlantas_Sel_Historial", new ListCensuses(new PageRequest<>(1,p.tamanio(),p.filtros(),p.ordenCampo(),p.ordenDireccion())), i,m,CensusModels.Summary.class);
+        if (!first.exitoso()) return first;
+        var count = first.datos();
+        return new PersistenceResult<>(result.exitoso(),result.codigo(),result.mensaje(),result.httpSugerido(),
+                new PageResult<>(result.datos().items(),result.datos().pagina(),result.datos().tamanio(),count.totalRegistros(),count.totalPaginas()));
     }
 
     @Override

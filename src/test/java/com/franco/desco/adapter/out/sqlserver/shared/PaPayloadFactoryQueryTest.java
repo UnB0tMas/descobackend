@@ -40,4 +40,20 @@ class PaPayloadFactoryQueryTest {
         assertEquals(4L, role.path("rolId").longValue());
         assertEquals(4L, role.path("rol").path("rolId").longValue());
     }
+
+    @Test void mutationPreservaTextoTratamientoDentroDelObjetoSemantico() throws Exception {
+        var identity=new SessionIdentity(1L,UUID.randomUUID(),1,"jti");
+        var metadata=new RequestMetadata(UUID.randomUUID(),UUID.randomUUID(),null,"127.0.0.1","/test","test","test","test","device");
+        var command=new com.franco.desco.application.sanitation.SanitationCommands.Treatment(7L,8L,9L,java.time.Instant.now(),"Aplicar tratamiento","Producto",java.math.BigDecimal.ONE,"ml","Prueba");
+        var json=jsonMapper.readTree(factory.mutation(identity,metadata,command));
+        assertEquals(7L,json.path("tratamiento").path("casoFitosanitarioId").longValue());
+        assertEquals("Aplicar tratamiento",json.path("tratamiento").path("tratamiento").stringValue());
+    }
+    @Test void mutationIncluyeElObjetoProduccion() throws Exception {
+        var identity=new SessionIdentity(1L,UUID.randomUUID(),1,"jti");
+        var metadata=new RequestMetadata(UUID.randomUUID(),UUID.randomUUID(),null,"127.0.0.1","/test","test","test","test","device");
+        var command=new com.franco.desco.application.production.ProductionCommands.Create(7L,8L,java.time.Instant.now(),java.time.LocalDate.now(),java.time.LocalDate.now().plusDays(1),java.math.BigDecimal.TEN,"Prueba");
+        var json=jsonMapper.readTree(factory.mutation(identity,metadata,command));
+        assertEquals(7L,json.path("produccion").path("parcelaCultivoId").longValue());
+    }
 }

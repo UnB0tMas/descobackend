@@ -163,7 +163,7 @@ public final class GpWebTypes {
         public boolean isMedicionValida(){
             return cantidadAproximada==null && superficieAproximadaM2==null &&
                 superficieExactaM2!=null && superficieExactaM2.signum()>0 &&
-                (cantidadExacta==null || cantidadExacta>0);
+                (cantidadExacta==null || cantidadExacta>=0);
         }
     }
     @Schema(name = "GpEventoAltaRequest")

@@ -57,6 +57,14 @@ public class ResourceReadService {
                     .addValue("cEstado", trim(state)).addValue("nPagina", page).addValue("nTamano", size));
             if (!ok(out)) return error(out, "BIENES_NO_LISTADOS", "No se pudo consultar el inventario.");
             List<ResourceModels.AssetListItem> items = list(out, "items");
+            if (items.isEmpty() && page > 1) {
+                Map<String,Object> first = assetsCall.execute(parameters.addValue("nPagina",1));
+                if (!ok(first)) return error(first,"CONSULTA_NO_COMPLETADA","No se pudo consultar el total.");
+                List<ResourceModels.AssetListItem> firstItems = list(first,"items");
+                PageResult<ResourceModels.AssetListItem> metadata = page(firstItems,1,size);
+                return AppResult.ok(code(out,"CONSULTA_REALIZADA"),message(out,"Consulta realizada."),
+                        new PageResult<>(items,page,size,metadata.totalRegistros(),metadata.totalPaginas()));
+            }
             return AppResult.ok(code(out, "BIENES_LISTADOS"), message(out, "Inventario consultado."), page(items, page, size));
         } catch (DataAccessException exception) {
             return AppResult.error(AppStatus.SERVICE_UNAVAILABLE, "BIENES_NO_LISTADOS", "No se pudo consultar el inventario.");
@@ -73,6 +81,14 @@ public class ResourceReadService {
                     .addValue("bEstado", active).addValue("nPagina", page).addValue("nTamano", size));
             if (!ok(out)) return error(out, "PRODUCTOS_NO_LISTADOS", "No se pudieron consultar los productos.");
             List<ResourceModels.ProductListItem> items = list(out, "items");
+            if (items.isEmpty() && page > 1) {
+                Map<String,Object> first = productsCall.execute(parameters.addValue("nPagina",1));
+                if (!ok(first)) return error(first,"CONSULTA_NO_COMPLETADA","No se pudo consultar el total.");
+                List<ResourceModels.ProductListItem> firstItems = list(first,"items");
+                PageResult<ResourceModels.ProductListItem> metadata = page(firstItems,1,size);
+                return AppResult.ok(code(out,"CONSULTA_REALIZADA"),message(out,"Consulta realizada."),
+                        new PageResult<>(items,page,size,metadata.totalRegistros(),metadata.totalPaginas()));
+            }
             return AppResult.ok(code(out, "PRODUCTOS_LISTADOS"), message(out, "Productos consultados."), page(items, page, size));
         } catch (DataAccessException exception) {
             return AppResult.error(AppStatus.SERVICE_UNAVAILABLE, "PRODUCTOS_NO_LISTADOS", "No se pudieron consultar los productos.");

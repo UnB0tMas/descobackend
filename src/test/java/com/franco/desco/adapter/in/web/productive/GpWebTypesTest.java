@@ -34,4 +34,10 @@ class GpWebTypesTest {
         var q=new GpWebTypes.EventoAlta("INCIDENCIA",2,null,null,"Enfermedad",null,null,true);
         assertThat(q.isCantidadValida()).isFalse();
     }
+
+    @Test void censoPermiteCeroParaCerrarPeroAltaDeCrianzaExigeAnimales() {
+        assertThat(new GpWebTypes.CensoAlta(null,0,null,new BigDecimal("400"),List.of(),List.of(),"Cierre de crianza",1L).isMedicionValida()).isTrue();
+        assertThat(new GpWebTypes.CensoAlta(null,-1,null,new BigDecimal("400"),List.of(),List.of(),"Cantidad negativa",1L).isMedicionValida()).isFalse();
+        assertThat(new GpWebTypes.ActividadAlta(1L,"CRIANZA",null,4,null,null,0,null,new BigDecimal("250"),List.of(),List.of()).isValida()).isFalse();
+    }
 }

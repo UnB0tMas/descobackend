@@ -41,6 +41,7 @@ import java.util.List;
 @Validated
 public class SupplyController {
 
+    private final com.franco.desco.adapter.in.web.common.idempotency.IdempotencyKeyResolver idempotency;
     private final SupplyUotService service;
     private final SupplyWebMapper mapper;
     private final ApiResponseFactory responses;
@@ -50,8 +51,10 @@ public class SupplyController {
             SupplyUotService service,
             SupplyWebMapper mapper,
             ApiResponseFactory responses,
-            JwtSessionIdentityResolver identities
+            JwtSessionIdentityResolver identities,
+            com.franco.desco.adapter.in.web.common.idempotency.IdempotencyKeyResolver idempotency
     ) {
+        this.idempotency = idempotency;
         this.service = service;
         this.mapper = mapper;
         this.responses = responses;
@@ -105,7 +108,8 @@ public class SupplyController {
                         body.nombre(),
                         body.unidadMedida(),
                         body.stockInicial(),
-                        body.stockMinimo()
+                        body.stockMinimo(),
+                        idempotency.required(request)
                 ),
                 request,
                 SupplyResponses.Created::new
@@ -132,7 +136,8 @@ public class SupplyController {
                         id,
                         body.nombre(),
                         body.unidadMedida(),
-                        body.stockMinimo()
+                        body.stockMinimo(),
+                        idempotency.required(request)
                 ),
                 request
         );
@@ -182,7 +187,8 @@ public class SupplyController {
                         body.tipoMovimiento(),
                         body.cantidad(),
                         body.documentoReferencia(),
-                        body.observacion()
+                        body.observacion(),
+                        idempotency.required(request)
                 ),
                 request,
                 SupplyResponses.MovementCreated::new
@@ -207,7 +213,8 @@ public class SupplyController {
                         identities.resolve(authentication),
                         body.uotId(),
                         id,
-                        body.motivo()
+                        body.motivo(),
+                        idempotency.required(request)
                 ),
                 request
         );

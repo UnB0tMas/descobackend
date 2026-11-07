@@ -206,6 +206,10 @@ public class ResourceProgramContextService {
             SessionIdentity identity,
             RequestMetadata metadata
     ) {
+        if (command.salidaCampoId() != null) {
+            return AppResult.error(AppStatus.CONFLICT, "SALIDA_RECURSOS_GESTION_E2",
+                    "Gestione los recursos de esta salida desde Salidas de campo. Deben incluirse en su solicitud y autorización.");
+        }
         AppResult<Long> validation = validateDestination(
                 identity,
                 command.campaniaVentaId(),

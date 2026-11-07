@@ -18,8 +18,8 @@ class E2SqlServerAdapterTest {
         var identity = new SessionIdentity(3L,null,1,"jwt");
         var meta = new RequestMetadata(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),
                 "127.0.0.1","/api/v1/salidas-operativas","test","test","test","test");
-        var command = new E2Commands.Execute("DECIDIR",1L,null,2L,null,null,null,null);
-        var result = adapter.execute(command,identity,meta,String.class);
+        var command = new E2Commands.Decidir(1L,null,2L,new E2Commands.DecisionDatos("APROBAR",null));
+        var result = adapter.decidir(command,identity,meta);
         assertThat(result.exitoso()).isFalse();
         assertThat(result.httpSugerido()).isEqualTo(401);
         verifyNoInteractions(jdbc);

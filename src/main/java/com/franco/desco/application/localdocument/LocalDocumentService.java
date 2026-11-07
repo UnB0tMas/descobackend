@@ -45,6 +45,14 @@ public class LocalDocumentService {
     public AppResult<LocalDocumentModels.FileInfo> upload(
             SessionIdentity identity, Long uotId, MultipartFile file, String category, String description,
             String targetType, Long targetId, boolean principal, UUID idempotencyKey) {
+        return upload(identity,uotId,file,category,description,targetType,targetId,principal,idempotencyKey,null);
+    }
+
+    public record EvidenceMetadata(String tipo, String origen, Instant fecha, Double latitud, Double longitud) {}
+
+    public AppResult<LocalDocumentModels.FileInfo> upload(
+            SessionIdentity identity, Long uotId, MultipartFile file, String category, String description,
+            String targetType, Long targetId, boolean principal, UUID idempotencyKey, EvidenceMetadata evidence) {
         if (file == null || file.isEmpty()) {
             return bad("Seleccione un archivo para cargar.");
         }
@@ -59,9 +67,14 @@ public class LocalDocumentService {
             return AppResult.error(AppStatus.BAD_REQUEST, "ARCHIVO_INVALIDO", exception.getMessage());
         }
         String normalizedTarget = targetType == null || targetType.isBlank() ? "NINGUNO" : targetType.trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("NINGUNO", "BIEN", "PRODUCTO", "SALIDA").contains(normalizedTarget)) return bad("El tipo de vínculo del archivo no es válido.");
+        if (!Set.of("NINGUNO", "BIEN", "PRODUCTO", "SALIDA", "PREDIO", "PARCELA", "CULTIVO", "CENSO", "VISITA", "EVALUACION", "CASO_SANIDAD", "TRATAMIENTO", "SEGUIMIENTO", "PRODUCCION").contains(normalizedTarget)) return bad("El tipo de vínculo del archivo no es válido.");
         if (!"NINGUNO".equals(normalizedTarget) && targetId == null) return bad("Seleccione el registro al que pertenece el archivo.");
 
+        if(evidence!=null) {
+            if(evidence.tipo()==null || (evidence.tipo().isBlank() || evidence.tipo().length()>40) || !Set.of("CARGA","CAMARA").contains(evidence.origen())) return bad("Tipo de evidencia inválido.");
+            if("CAMARA".equals(evidence.origen()) && (file.getContentType()==null || !file.getContentType().startsWith("image/"))) return bad("La captura debe ser una imagen.");
+            if((evidence.latitud()==null)!=(evidence.longitud()==null) || (evidence.latitud()!=null && (!Double.isFinite(evidence.latitud()) || !Double.isFinite(evidence.longitud()) || Math.abs(evidence.latitud())>90 || Math.abs(evidence.longitud())>180))) return bad("Coordenadas inválidas.");
+        }
         String key = storage.deterministicKey(
                 uotId,
                 identity.usuarioId(),
@@ -107,6 +120,11 @@ public class LocalDocumentService {
                     Long fileId = SqlProcedureExecutor.longValue(out, "nArchivoId");
                     jdbc.update("UPDATE archivo.Archivo SET hash_sha256=? WHERE archivo_id=?", HexFormat.of().parseHex(stored.sha256Hex()), fileId);
                     link(identity, uotId, fileId, stored.contentType(), normalizedTarget, targetId, principal);
+                    if(evidence!=null) jdbc.update("""
+                        UPDATE archivo.Archivo SET tipo_evidencia=?,origen_captura=?,fecha_captura=?,
+                        posicion_captura=CASE WHEN ? IS NULL THEN NULL ELSE geography::Point(?,?,4326) END WHERE archivo_id=?
+                        """,evidence.tipo(),evidence.origen(),evidence.fecha()==null?null:java.time.LocalDateTime.ofInstant(evidence.fecha(),java.time.ZoneOffset.UTC),
+                        evidence.latitud(),evidence.latitud(),evidence.longitud(),fileId);
                     return getInternal(fileId);
                 } catch (RuntimeException exception) {
                     deleteQueue.enqueue(stored.storageKey());
@@ -257,6 +275,10 @@ public class LocalDocumentService {
             jdbc.update("INSERT archivo.ArchivoVinculo(archivo_id,salida_campo_id,estado) VALUES(?,?,1)",fileId,targetId);
             return;
         }
+        if (!Set.of("BIEN","PRODUCTO").contains(type)) {
+            linkTechnical(identity,uotId,fileId,type,targetId);
+            return;
+        }
         if (!mime.startsWith("image/")) throw new StorageFailure("Para vincular una imagen seleccione un archivo de imagen válido.");
         if ("BIEN".equals(type)) {
             if (!uot.hasPermission(identity, uotId, "INVENTARIO_EDITAR")) throw new StorageFailure("No tiene permiso para modificar imágenes del bien.");
@@ -271,6 +293,30 @@ public class LocalDocumentService {
         if (exists == null || exists == 0) throw new StorageFailure("El producto no está disponible.");
         if (principal) jdbc.update("UPDATE logistica.ProductoImagen SET es_principal=0 WHERE producto_id=? AND estado=1", targetId);
         jdbc.update("INSERT logistica.ProductoImagen(producto_id,archivo_id,es_principal,orden,estado) VALUES(?,?,?,COALESCE((SELECT MAX(orden)+1 FROM logistica.ProductoImagen WHERE producto_id=?),1),1)", targetId, fileId, principal, targetId);
+    }
+
+    private record TechnicalTarget(String column, String permission, String predioQuery) {}
+    private void linkTechnical(SessionIdentity identity,Long uotId,Long fileId,String type,Long targetId) {
+        // Table/column identifiers come only from this fixed server-side allowlist.
+        TechnicalTarget target=switch(type) {
+            case "PREDIO" -> new TechnicalTarget("predio_id","PREDIOS_VER","SELECT predio_id FROM prod.Predio WHERE predio_id=? AND estado=1");
+            case "PARCELA" -> new TechnicalTarget("parcela_id","CULTIVOS_VER","SELECT predio_id FROM prod.Parcela WHERE parcela_id=? AND estado=1");
+            case "CULTIVO" -> new TechnicalTarget("parcela_cultivo_id","CULTIVOS_VER","SELECT P.predio_id FROM prod.ParcelaCultivo C JOIN prod.Parcela P ON P.parcela_id=C.parcela_id WHERE C.parcela_cultivo_id=? AND C.estado=1 AND C.situacion_cultivo='ACTIVO'");
+            case "CENSO" -> new TechnicalTarget("censo_plantas_id","CENSOS_VER","SELECT P.predio_id FROM prod.CensoPlantas X JOIN prod.ParcelaCultivo C ON C.parcela_cultivo_id=X.parcela_cultivo_id JOIN prod.Parcela P ON P.parcela_id=C.parcela_id WHERE X.censo_plantas_id=? AND X.estado=1 AND C.situacion_cultivo='ACTIVO'");
+            case "VISITA" -> new TechnicalTarget("visita_tecnica_id","VISITAS_VER","SELECT predio_id FROM campo.VisitaTecnica WHERE visita_tecnica_id=? AND estado=1 AND estado_proceso='INICIADA'");
+            case "EVALUACION" -> new TechnicalTarget("evaluacion_agronomica_id","EVALUACIONES_VER","SELECT V.predio_id FROM campo.EvaluacionAgronomica X JOIN campo.VisitaTecnica V ON V.visita_tecnica_id=X.visita_tecnica_id WHERE X.evaluacion_agronomica_id=? AND X.estado=1 AND V.estado_proceso='INICIADA'");
+            case "CASO_SANIDAD" -> new TechnicalTarget("caso_fitosanitario_id","SANIDAD_VER","SELECT P.predio_id FROM sanidad.CasoFitosanitario X JOIN prod.ParcelaCultivo C ON C.parcela_cultivo_id=X.parcela_cultivo_id JOIN prod.Parcela P ON P.parcela_id=C.parcela_id WHERE X.caso_fitosanitario_id=? AND X.estado=1 AND X.estado_caso<>'CERRADO'");
+            case "TRATAMIENTO" -> new TechnicalTarget("tratamiento_id","SANIDAD_VER","SELECT P.predio_id FROM sanidad.TratamientoFitosanitario X JOIN sanidad.CasoFitosanitario CF ON CF.caso_fitosanitario_id=X.caso_fitosanitario_id JOIN prod.ParcelaCultivo C ON C.parcela_cultivo_id=CF.parcela_cultivo_id JOIN prod.Parcela P ON P.parcela_id=C.parcela_id WHERE X.tratamiento_fitosanitario_id=? AND X.estado=1 AND CF.estado=1 AND CF.estado_caso<>'CERRADO'");
+            case "SEGUIMIENTO" -> new TechnicalTarget("seguimiento_fitosanitario_id","SANIDAD_VER","SELECT P.predio_id FROM sanidad.SeguimientoFitosanitario X JOIN sanidad.CasoFitosanitario CF ON CF.caso_fitosanitario_id=X.caso_fitosanitario_id JOIN prod.ParcelaCultivo C ON C.parcela_cultivo_id=CF.parcela_cultivo_id JOIN prod.Parcela P ON P.parcela_id=C.parcela_id WHERE X.seguimiento_fitosanitario_id=? AND X.estado=1 AND CF.estado=1 AND CF.estado_caso<>'CERRADO'");
+            case "PRODUCCION" -> new TechnicalTarget("disponibilidad_produccion_id","PRODUCCION_VER","SELECT P.predio_id FROM prod.DisponibilidadProduccion X JOIN prod.ParcelaCultivo C ON C.parcela_cultivo_id=X.parcela_cultivo_id JOIN prod.Parcela P ON P.parcela_id=C.parcela_id WHERE X.disponibilidad_produccion_id=? AND X.estado=1 AND X.estado_estimacion='ESTIMADA'");
+            default -> throw new StorageFailure("Contexto no disponible.");
+        };
+        if(!uot.hasPermission(identity,uotId,target.permission())) throw new StorageFailure("No tiene permiso para adjuntar evidencia en este contexto.");
+        var predios=jdbc.queryForList(target.predioQuery(),Long.class,targetId);
+        if(predios.size()!=1) throw new StorageFailure("El contexto no está disponible o ya está cerrado.");
+        Integer matches=jdbc.queryForObject("SELECT COUNT(*) FROM prod.PredioAmbito WHERE predio_id=? AND uot_id=? AND estado=1 AND (convenio_uot_organizacion_id IS NULL OR seg.FN_Usuario_TienePermisoUOT(?,uot_id,'APAPPSS_PREDIOS_VER')=1)",Integer.class,predios.getFirst(),uotId,identity.usuarioId());
+        if(matches==null||matches==0) throw new StorageFailure("El contexto no pertenece a la UOT seleccionada.");
+        jdbc.update("INSERT archivo.ArchivoVinculo(archivo_id,"+target.column()+",estado) VALUES(?,?,1)",fileId,targetId);
     }
 
     private LocalDocumentModels.FileInfo findByKey(Long userId, Long uotId, String key) {
@@ -309,7 +355,7 @@ public class LocalDocumentService {
         return new LocalDocumentModels.FileInfo(rs.getLong("archivo_id"), rs.getLong("uot_id"), rs.getString("uot_nombre"),
                 rs.getString("nombre_original"), rs.getString("mime_type"), rs.getLong("tamano_bytes"), rs.getString("categoria"),
                 rs.getString("descripcion"), rs.getString("clave_almacenamiento"), hash == null ? null : HexFormat.of().formatHex(hash),
-                rs.getTimestamp("fecha_carga").toInstant());
+                rs.getTimestamp("fecha_carga").toLocalDateTime().toInstant(java.time.ZoneOffset.UTC));
     }
 
     private static Object uploadLock(UUID idempotencyKey) {

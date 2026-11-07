@@ -14,6 +14,15 @@ import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
+import com.franco.desco.adapter.out.sql.common.SqlIdempotencyCoordinator;
+import com.franco.desco.application.shared.ApplicationResults;
+import com.franco.desco.application.shared.PersistenceResult;
+import java.util.UUID;
+import java.util.Arrays;
+import java.util.HexFormat;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import tools.jackson.databind.json.JsonMapper;
 import java.math.BigDecimal;
 import java.sql.Types;
 import java.util.List;
@@ -32,7 +41,12 @@ public class SupplyUotService {
     private final SimpleJdbcCall suggestedCode;
     private final JdbcTemplate jdbc;
 
-    public SupplyUotService(DataSource dataSource) {
+    private final SqlIdempotencyCoordinator idempotency;
+    private final JsonMapper json;
+
+    public SupplyUotService(DataSource dataSource, SqlIdempotencyCoordinator idempotency, JsonMapper json) {
+        this.idempotency = idempotency;
+        this.json = json;
         this.jdbc = new JdbcTemplate(dataSource);
 
         this.list = base(
@@ -125,7 +139,7 @@ public class SupplyUotService {
                         (Long) rs.getObject("recursoProgramadoId"),
                         rs.getString("tipoMovimiento"),
                         rs.getBigDecimal("cantidad"),
-                        rs.getTimestamp("fechaHora").toInstant(),
+                        rs.getTimestamp("fechaHora").toLocalDateTime().toInstant(java.time.ZoneOffset.UTC),
                         rs.getString("documentoReferencia"),
                         rs.getString("observacion"),
                         rs.getString("usuario"),
@@ -208,7 +222,7 @@ public class SupplyUotService {
         }
     }
 
-    public AppResult<Long> create(
+    private AppResult<Long> createOnce(
             SessionIdentity identity,
             Long uotId,
             String code,
@@ -274,7 +288,7 @@ public class SupplyUotService {
         }
     }
 
-    public AppResult<Void> update(
+    private AppResult<Void> updateOnce(
             SessionIdentity identity,
             Long uotId,
             Long id,
@@ -309,7 +323,7 @@ public class SupplyUotService {
         }
     }
 
-    public AppResult<Long> movement(
+    private AppResult<Long> movementOnce(
             SessionIdentity identity,
             Long uotId,
             Long id,
@@ -379,7 +393,7 @@ public class SupplyUotService {
         }
     }
 
-    public AppResult<Void> cancel(
+    private AppResult<Void> cancelOnce(
             SessionIdentity identity,
             Long uotId,
             Long id,
@@ -408,6 +422,58 @@ public class SupplyUotService {
         } catch (DataAccessException exception) {
             return unavailable();
         }
+    }
+
+    public AppResult<Long> create(SessionIdentity actor, Long uotId, String code, String name,
+            String unit, BigDecimal initial, BigDecimal minimum, UUID key) {
+        return ApplicationResults.created(idempotency.executeLong(actor.usuarioId(),key,"SUMINISTRO_CREAR",
+                "logistica","Suministro",hash(uotId,code,name,unit,initial,minimum),
+                () -> persistence(createOnce(actor,uotId,code,name,unit,initial,minimum))),
+                "SUMINISTRO_CREADO","SUMINISTRO_NO_CREADO");
+    }
+
+    public AppResult<Void> update(SessionIdentity actor, Long uotId, Long id, String name,
+            String unit, BigDecimal minimum, UUID key) {
+        return ApplicationResults.ok(idempotency.executeVoid(actor.usuarioId(),key,"SUMINISTRO_EDITAR",
+                "logistica","Suministro",hash(uotId,id,name,unit,minimum),
+                () -> persistence(updateOnce(actor,uotId,id,name,unit,minimum))),
+                "SUMINISTRO_ACTUALIZADO","SUMINISTRO_NO_ACTUALIZADO",AppStatus.BAD_REQUEST);
+    }
+
+    public AppResult<Long> movement(SessionIdentity actor, Long uotId, Long id, String type,
+            BigDecimal quantity, String document, String observation, UUID key) {
+        return ApplicationResults.created(idempotency.executeLong(actor.usuarioId(),key,"SUMINISTRO_MOVIMIENTO",
+                "logistica","SuministroMovimiento",hash(uotId,id,type,quantity,document,observation),
+                () -> persistence(movementOnce(actor,uotId,id,type,quantity,document,observation))),
+                "SUMINISTRO_MOVIMIENTO_CREADO","SUMINISTRO_MOVIMIENTO_NO_CREADO");
+    }
+
+    public AppResult<Void> cancel(SessionIdentity actor, Long uotId, Long id, String reason, UUID key) {
+        return ApplicationResults.ok(idempotency.executeVoid(actor.usuarioId(),key,"SUMINISTRO_ANULAR",
+                "logistica","SuministroMovimiento",hash(uotId,id,reason),
+                () -> persistence(cancelOnce(actor,uotId,id,reason))),
+                "SUMINISTRO_MOVIMIENTO_ANULADO","SUMINISTRO_MOVIMIENTO_NO_ANULADO",AppStatus.BAD_REQUEST);
+    }
+
+    private String hash(Object... values) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(
+                    json.writeValueAsString(Arrays.asList(values)).getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception exception) {
+            throw new IllegalStateException("No se pudo identificar la solicitud.",exception);
+        }
+    }
+
+    private static <T> PersistenceResult<T> persistence(AppResult<T> result) {
+        int http = switch(result.estado()) {
+            case UNAUTHORIZED -> 401;
+            case FORBIDDEN -> 403;
+            case NOT_FOUND -> 404;
+            case CONFLICT -> 409;
+            case SERVICE_UNAVAILABLE -> 503;
+            default -> result.exitoso() ? 200 : 400;
+        };
+        return new PersistenceResult<>(result.exitoso(),result.codigo(),result.mensaje(),http,result.datos());
     }
 
     private static SimpleJdbcCall base(

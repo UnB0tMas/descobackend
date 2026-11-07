@@ -51,7 +51,7 @@ public final class E2DocumentService {
                 (rs,n)->new Documento(rs.getLong("archivoId"),rs.getLong("salidaId"),
                   rs.getString("salidaNombre"),rs.getString("nombreOriginal"),
                   rs.getString("mimeType"),rs.getString("tipo"),
-                  rs.getTimestamp("fechaCarga").toInstant(),rs.getLong("tamanoBytes")),
+                  rs.getTimestamp("fechaCarga").toLocalDateTime().toInstant(java.time.ZoneOffset.UTC),rs.getLong("tamanoBytes")),
                 identity.usuarioId(),uot,salida,soloPropios);
             return AppResult.ok("E2_DOCUMENTOS_LISTADOS","Documentos consultados.",docs);
         }catch(DataAccessException ex){
@@ -64,6 +64,14 @@ public final class E2DocumentService {
         if(identity==null||identity.usuarioId()==null||uot==null||salida==null)
             return AppResult.error(AppStatus.BAD_REQUEST,"E2_DOC_CONTEXTO","Identifique la salida y la sesión.");
         try {
+            Integer allowed=jdbc.queryForObject("""
+                SELECT COUNT(*) FROM campo.SalidaE2 E JOIN seg.Usuario U ON U.usuario_id=?
+                WHERE E.salida_campo_id=? AND E.uot_id=? AND E.solicitante_empleado_id=U.persona_id
+                  AND E.estado NOT IN('BORRADOR','ELIMINADA','CANCELADA')
+                  AND seg.FN_Usuario_TienePermisoUOT(?,E.uot_id,'SALIDAS_EDITAR')=1
+                """,Integer.class,identity.usuarioId(),salida,uot,identity.usuarioId());
+            if(allowed==null||allowed==0)
+                return AppResult.error(AppStatus.FORBIDDEN,"E2_DOC_NO_AUTORIZADO","Solo el responsable puede generar el documento de su solicitud confirmada.");
             String json=jdbc.queryForObject("EXEC campo.PA_SalidaDocumento_Sel_Datos ?,?,?",
                     String.class,identity.usuarioId(),uot,salida);
             if(json==null||json.isBlank())

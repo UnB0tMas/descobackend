@@ -194,7 +194,7 @@ public class PaResultSets {
         }
 
         if (value instanceof Timestamp timestamp) {
-            return timestamp.toInstant();
+            return timestamp.toLocalDateTime().toInstant(java.time.ZoneOffset.UTC);
         }
 
         if (value instanceof OffsetDateTime offsetDateTime) {

@@ -63,7 +63,7 @@ public final class SqlIdempotencyCoordinator {
                  @nUsuarioId = ?,
                  @gClaveIdempotencia = ?,
                  @cAmbito = ?,
-                 @cRequestHashHex = NULL,
+                 @cRequestHashHex = ?,
                  @nMinutosVigencia = 1440,
                  @nOperacionIdempotenteId = @id OUTPUT,
                  @bEsRepetida = @repetida OUTPUT,
@@ -184,6 +184,16 @@ public final class SqlIdempotencyCoordinator {
         );
     }
 
+    public PersistenceResult<Long> executeLong(Long userId, UUID key, String scope,
+            String schema, String entity, String requestHash, Supplier<PersistenceResult<Long>> operation) {
+        return execute(userId,key,scope,schema,entity,operation,this::parseLongReplay,requestHash);
+    }
+
+    public PersistenceResult<Void> executeVoid(Long userId, UUID key, String scope,
+            String schema, String entity, String requestHash, Supplier<PersistenceResult<Void>> operation) {
+        return execute(userId,key,scope,schema,entity,operation,ignored -> null,requestHash);
+    }
+
     private <T> PersistenceResult<T> execute(
             Long userId,
             UUID idempotencyKey,
@@ -193,6 +203,12 @@ public final class SqlIdempotencyCoordinator {
             Supplier<PersistenceResult<T>> operation,
             Function<String, T> replayValue
     ) {
+        return execute(userId,idempotencyKey,scope,entitySchema,entityName,operation,replayValue,null);
+    }
+
+    private <T> PersistenceResult<T> execute(Long userId, UUID idempotencyKey, String scope,
+            String entitySchema, String entityName, Supplier<PersistenceResult<T>> operation,
+            Function<String,T> replayValue, String requestHash) {
         if (userId == null
                 || idempotencyKey == null
                 || !hasText(scope)
@@ -226,7 +242,8 @@ public final class SqlIdempotencyCoordinator {
                 Reservation reservation = reserve(
                         userId,
                         idempotencyKey,
-                        normalizedScope
+                        normalizedScope,
+                        requestHash
                 );
 
                 if (!reservation.accepted()) {
@@ -277,6 +294,9 @@ public final class SqlIdempotencyCoordinator {
             }
 
             return result;
+        } catch (com.franco.desco.application.shared.BusinessRuleViolation exception) {
+            // TransactionTemplate has already rolled back the asset and its history.
+            return PersistenceResult.error(exception.getMessage());
         } catch (RuntimeException exception) {
             log.error(
                     "Fallo en idempotencia SQL. userId={} scope={} key={} error={}",
@@ -335,14 +355,16 @@ public final class SqlIdempotencyCoordinator {
     private Reservation reserve(
             Long userId,
             UUID idempotencyKey,
-            String scope
+            String scope,
+            String requestHash
     ) {
         return jdbc.queryForObject(
                 RESERVE_SQL,
                 (resultSet, rowNum) -> reservation(resultSet),
                 userId,
                 idempotencyKey.toString(),
-                scope
+                scope,
+                requestHash
         );
     }
 
