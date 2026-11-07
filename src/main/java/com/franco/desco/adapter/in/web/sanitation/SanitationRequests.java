@@ -72,8 +72,13 @@ public final class SanitationRequests {
             @Digits(integer = 8, fraction = 4)
             BigDecimal dosis,
             @Size(max = 30) String unidadDosis,
-            @Size(max = 400) String observacion
+            @Size(max = 400) String observacion,
+            @Positive Long programacionProductoId,
+            @Positive @Digits(integer=16,fraction=3) BigDecimal cantidadUtilizada
     ) {
+        @AssertTrue(message = "Seleccione el producto entregado y su cantidad utilizada.")
+        public boolean isConsumoCompleto() { return (programacionProductoId == null) == (cantidadUtilizada == null); }
+
         @AssertTrue(message = "La dosis y la unidad deben informarse juntas.")
         public boolean dosisCompleta() {
             boolean hasDose = dosis != null;

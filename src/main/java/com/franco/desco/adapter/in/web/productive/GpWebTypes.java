@@ -106,7 +106,7 @@ public final class GpWebTypes {
     @Schema(name="GpTratamientoSeguimientoResponse")
     public record TratamientoSeguimiento(Long eventoId,Long incidenciaId,Integer tratamientoId,String tratamiento,
       String descripcion,LocalDateTime fechaInicio,LocalDateTime fechaFinPrevista,LocalDateTime fechaFinReal,
-      String descripcionCierre,Long usuarioId) {}
+      String descripcionCierre,Long usuarioId,String producto,BigDecimal cantidadUtilizada,String unidadUtilizada) {}
     @Schema(name="GpIncidenciaAltaRequest")
     public record IncidenciaAlta(@NotNull @Positive Integer problemaId,
       @DecimalMin("0.01") @Digits(integer=12,fraction=2) BigDecimal afectadaM2,
@@ -117,7 +117,8 @@ public final class GpWebTypes {
     @Schema(name="GpTratamientoAplicarRequest")
     public record TratamientoAplicar(@NotNull @Positive Long incidenciaId,
       @NotNull @Positive Integer tratamientoId,@NotBlank @Size(min=3,max=2000) String descripcion,
-      LocalDateTime fechaFinPrevista) {}
+      LocalDateTime fechaFinPrevista,@Positive Long programacionProductoId,
+      @Positive @Digits(integer=16,fraction=3) BigDecimal cantidadUtilizada) {}
     @Schema(name="GpTratamientoFinalizarRequest")
     public record TratamientoFinalizar(@NotBlank @Size(min=3,max=1000) String descripcion) {}
     @Schema(name="GpIncidenciaCerrarRequest")

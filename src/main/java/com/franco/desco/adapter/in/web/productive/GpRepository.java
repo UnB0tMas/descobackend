@@ -209,7 +209,7 @@ public class GpRepository {
         return db.query("EXEC prod.PA_GP_Tratamiento_Sel_Incidencia ?,?,?,?",(r,i)->new GpWebTypes.TratamientoSeguimiento(
             longValue(r,"eventoId"),longValue(r,"incidenciaId"),intValue(r,"tratamientoId"),r.getString("tratamiento"),
             r.getString("descripcion"),time(r,"fechaInicio"),time(r,"fechaFinPrevista"),time(r,"fechaFinReal"),
-            r.getString("descripcionCierre"),longValue(r,"usuarioId")),s.sesionPublicaId(),s.usuarioId(),u,actividad);
+            r.getString("descripcionCierre"),longValue(r,"usuarioId"),r.getString("producto"),r.getBigDecimal("cantidadUtilizada"),r.getString("unidadUtilizada")),s.sesionPublicaId(),s.usuarioId(),u,actividad);
     }
     public Long crearIncidencia(SessionIdentity s,long u,long actividad,GpWebTypes.IncidenciaAlta q,UUID key){
         verificarVisita(s,u,predioActividad(u,actividad));
@@ -237,8 +237,8 @@ public class GpRepository {
     }
     public Long aplicarTratamiento(SessionIdentity s,long u,long actividad,GpWebTypes.TratamientoAplicar q,UUID key){
         verificarVisita(s,u,predioActividad(u,actividad));
-        return db.queryForObject("EXEC prod.PA_GP_Tratamiento_Ins_Incidencia ?,?,?,?,?,?,?,?,?",Long.class,
-          s.sesionPublicaId(),s.usuarioId(),u,actividad,q.incidenciaId(),q.tratamientoId(),q.descripcion(),q.fechaFinPrevista(),key);
+        return db.queryForObject("EXEC prod.PA_GP_Tratamiento_Ins_Incidencia ?,?,?,?,?,?,?,?,?,?,?",Long.class,
+          s.sesionPublicaId(),s.usuarioId(),u,actividad,q.incidenciaId(),q.tratamientoId(),q.descripcion(),q.fechaFinPrevista(),key,q.programacionProductoId(),q.cantidadUtilizada());
     }
     public Long finalizarTratamiento(SessionIdentity s,long u,long evento,GpWebTypes.TratamientoFinalizar q,UUID key){
         verificarVisita(s,u,predioEvento(u,evento));

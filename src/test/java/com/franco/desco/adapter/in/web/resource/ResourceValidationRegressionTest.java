@@ -47,4 +47,13 @@ class ResourceValidationRegressionTest {
         assertEquals(400,result.getStatusCode().value());
         assertNotNull(result.getBody());
     }
+    @Test void assetProviderMustNotBeAPerson() {
+        try(var factory=Validation.buildDefaultValidatorFactory()) {
+            var validator=factory.getValidator();
+            var person=new ResourceRequests.CreateAsset(2L,1,null,"Bien",null,null,null,null,null,"PEN",13L,null,null,null);
+            var company=new ResourceRequests.CreateAsset(2L,1,null,"Bien",null,null,null,null,null,"PEN",null,7L,null,null);
+            assertFalse(validator.validate(person).isEmpty());
+            assertTrue(validator.validate(company).isEmpty());
+        }
+    }
 }

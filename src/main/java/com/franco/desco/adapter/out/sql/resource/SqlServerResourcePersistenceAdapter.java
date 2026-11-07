@@ -93,7 +93,7 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
     public PersistenceResult<Long> createAsset(SessionIdentity identity, ResourceCommands.CreateAsset command) {
         if (!uot.hasPermission(identity, command.uotId(), "INVENTARIO_CREAR")) return PersistenceResult.error("No tiene permiso para registrar recursos en esa UOT.");
         if (command.idempotencyKey() == null) return PersistenceResult.error("La clave de idempotencia es obligatoria.");
-        if (command.providerPersonId() != null && command.providerCompanyId() != null) return PersistenceResult.error("Seleccione un solo proveedor.");
+        if (!validAssetProvider(command.providerPersonId(),command.providerCompanyId())) return PersistenceResult.error("Seleccione una empresa activa de Administración como proveedor.");
         return idempotency.executeLong(identity.usuarioId(), command.idempotencyKey(),
                 "BIEN_UOT_CREAR", "logistica", "BienInventario", () -> {
             Long companyId = compatibilityCompany(command.uotId());
@@ -126,7 +126,7 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
         Long assetUot = assetUot(command.assetId());
         if (assetUot == null) return PersistenceResult.error("El recurso no está disponible.");
         if (!uot.hasPermission(identity, assetUot, "INVENTARIO_EDITAR")) return PersistenceResult.error("No tiene permiso para modificar el recurso.");
-        if (command.providerPersonId() != null && command.providerCompanyId() != null) return PersistenceResult.error("Seleccione un solo proveedor.");
+        if (!validAssetProvider(command.providerPersonId(),command.providerCompanyId())) return PersistenceResult.error("Seleccione una empresa activa de Administración como proveedor.");
         try {
             return transaction.execute(status -> {
                 validateVehicleType(command.assetTypeId(), command.vehicle());
@@ -142,6 +142,12 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
         } catch (RuntimeException e) {
             return PersistenceResult.error(e instanceof BusinessFailure ? e.getMessage() : "No se pudo actualizar el recurso.");
         }
+    }
+
+    private boolean validAssetProvider(Long personId,Long companyId) {
+        if(personId!=null)return false;
+        if(companyId==null)return true;
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT CONVERT(BIT,CASE WHEN EXISTS(SELECT 1 FROM org.Empresa E WHERE E.empresa_id=? AND E.estado=1 AND NOT EXISTS(SELECT 1 FROM org.Asociacion A WHERE A.asociacion_id=E.empresa_id)) THEN 1 ELSE 0 END)",Boolean.class,companyId));
     }
 
     private void validateVehicleType(Integer typeId, ResourceCommands.VehicleData vehicle) {

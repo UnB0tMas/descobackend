@@ -125,14 +125,4 @@ public class LogisticsOperationsController {
                 idempotency.required(request)),request);
     }
 
-    @PostMapping("/programados/{id}/adjuntos")
-    @IdempotentOperation
-    @PreAuthorize("@permissionGuard.has(authentication,'RECURSOS_EDITAR')")
-    @Operation(operationId="recursosProgramadosAdjuntarDocumento",summary="Vincular un archivo local de autorización")
-    public ResponseEntity<ApiResponse<Void>> attach(@PathVariable @Positive Long id,
-            @Valid @RequestBody LogisticsRequests.AttachFile body,
-            @Parameter(hidden=true) JwtAuthenticationToken authentication,
-            @Parameter(hidden=true) HttpServletRequest request) {
-        return responses.from(service.attach(identities.resolve(authentication),id,body.archivoId()),request);
-    }
 }

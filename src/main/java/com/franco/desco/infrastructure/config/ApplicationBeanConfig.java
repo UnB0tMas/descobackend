@@ -54,15 +54,9 @@ import com.franco.desco.application.pricing.service.PricingApplicationService;
 import com.franco.desco.application.producer.port.in.ProducerUseCase;
 import com.franco.desco.application.producer.port.out.ProducerPersistencePort;
 import com.franco.desco.application.producer.service.ProducerApplicationService;
-import com.franco.desco.application.production.port.in.ProductionUseCase;
-import com.franco.desco.application.production.port.out.ProductionPersistencePort;
-import com.franco.desco.application.production.service.ProductionApplicationService;
 import com.franco.desco.application.property.port.in.PropertyUseCase;
 import com.franco.desco.application.property.port.out.PropertyPersistencePort;
 import com.franco.desco.application.property.service.PropertyApplicationService;
-import com.franco.desco.application.resourceprogram.port.in.ResourceProgramUseCase;
-import com.franco.desco.application.resourceprogram.port.out.ResourceProgramPersistencePort;
-import com.franco.desco.application.resourceprogram.service.ResourceProgramApplicationService;
 import com.franco.desco.application.salesoperation.port.in.SalesOperationUseCase;
 import com.franco.desco.application.salesoperation.port.out.SalesOperationPersistencePort;
 import com.franco.desco.application.salesoperation.service.SalesOperationApplicationService;
@@ -232,10 +226,6 @@ public class ApplicationBeanConfig {
         return new FieldTripApplicationService(persistence);
     }
 
-    @Bean
-    ResourceProgramUseCase resourceProgramUseCase(ResourceProgramPersistencePort persistence) {
-        return new ResourceProgramApplicationService(persistence);
-    }
 
     @Bean
     VisitUseCase visitUseCase(VisitPersistencePort persistence) {
@@ -252,10 +242,6 @@ public class ApplicationBeanConfig {
         return new SanitationApplicationService(persistence);
     }
 
-    @Bean
-    ProductionUseCase productionUseCase(ProductionPersistencePort persistence) {
-        return new ProductionApplicationService(persistence);
-    }
 
     @Bean
     CampaignUseCase campaignUseCase(CampaignPersistencePort persistence) {

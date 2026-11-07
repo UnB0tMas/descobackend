@@ -21,6 +21,7 @@ import java.util.Map;
 
 @Repository
 public final class E1SqlServerAdapter implements E1PersistencePort {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(E1SqlServerAdapter.class);
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
 
@@ -125,7 +126,8 @@ public final class E1SqlServerAdapter implements E1PersistencePort {
                 CallableStatement statement = connection.prepareCall("{call prod.PA_ExpedienteProductivo_Ejecutar(?,?,?,?,?,?,?)}");
                 statement.setString(1, action);
                 statement.setNString(2, entrada);
-                statement.registerOutParameter(3, Types.NVARCHAR);
+                // The populated dossier can exceed the 4000-character NVARCHAR output buffer.
+                statement.registerOutParameter(3, Types.LONGNVARCHAR);
                 statement.registerOutParameter(4, Types.BIT);
                 statement.registerOutParameter(5, Types.NVARCHAR);
                 statement.registerOutParameter(6, Types.VARCHAR);
@@ -144,6 +146,7 @@ public final class E1SqlServerAdapter implements E1PersistencePort {
                         (int) statement.getShort(7), value);
             });
         } catch (Exception error) {
+            log.error("Error de expediente: accion={}, correlacion={}", action, meta.correlacionId(), error);
             return PersistenceResult.error("EXPEDIENTE_SQL_ERROR",
                     "No se pudo completar la operación; revise el contexto y vuelva a intentar.", 503);
         }
