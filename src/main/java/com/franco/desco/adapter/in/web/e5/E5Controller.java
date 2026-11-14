@@ -59,11 +59,12 @@ public class E5Controller {
         return run("REPARTO",null,gastoId,null,null,null,null,E5WebTypes.Repartos.class,a,r);
     }
     @PostMapping("/gastos/{gastoId}/repartir") @IdempotentOperation
-    @Operation(operationId="apappssE5Repartir",summary="Proponer reparto equitativo entre vendedores confirmados")
+    @Operation(operationId="apappssE5Repartir",summary="Proponer reparto igualitario, ponderado o manual según la regla del gasto")
     @PreAuthorize("@permissionGuard.has(authentication,'GASTOS_CREAR')")
     public ResponseEntity<ApiResponse<E5WebTypes.Reparto>> repartir(@PathVariable @Positive Long gastoId,
+      @Valid @RequestBody(required=false) E5WebTypes.RepartoRequest q,
       @Parameter(hidden=true) JwtAuthenticationToken a,@Parameter(hidden=true) HttpServletRequest r) {
-        return run("REPARTIR",null,gastoId,null,null,null,null,E5WebTypes.Reparto.class,a,r);
+        return run("REPARTIR",null,gastoId,null,null,null,q,E5WebTypes.Reparto.class,a,r);
     }
     @PostMapping("/gastos/{gastoId}/repartos/aprobar") @IdempotentOperation
     @Operation(operationId="apappssE5AprobarReparto",summary="Congelar y aprobar el reparto del gasto")
@@ -76,7 +77,7 @@ public class E5Controller {
     @Operation(operationId="apappssE5RectificarReparto",summary="Rectificar con autorización preservando historial")
     @PreAuthorize("@permissionGuard.has(authentication,'GASTOS_APROBAR')")
     public ResponseEntity<ApiResponse<E5WebTypes.Reparto>> rectificarReparto(@PathVariable @Positive Long gastoId,
-      @Valid @RequestBody E5WebTypes.Observacion q,@Parameter(hidden=true) JwtAuthenticationToken a,
+      @Valid @RequestBody E5WebTypes.RepartoRectificacion q,@Parameter(hidden=true) JwtAuthenticationToken a,
       @Parameter(hidden=true) HttpServletRequest r) {
         return run("RECTIFICAR_REPARTO",null,gastoId,null,null,null,q,E5WebTypes.Reparto.class,a,r);
     }

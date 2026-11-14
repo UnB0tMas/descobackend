@@ -26,7 +26,7 @@ public final class E1Models {
     public record Censo(Long id,String cultivo,LocalDate fecha,Integer total,Integer productivas,String observacion) {}
     public record Conteo(Long id, Long crianzaId, Integer cantidad, LocalDate fechaHecho, String observacion) {}
     public record Expediente(Long predioId, String codigo, String nombre, String distritoCodigo, String referencia,
-                             BigDecimal latitud, BigDecimal longitud, BigDecimal areaTotalHa, BigDecimal areaCultivableHa,
+                             Long centroPobladoId, String centroPoblado, BigDecimal latitud, BigDecimal longitud, BigDecimal areaTotalHa, BigDecimal areaCultivableHa,
                              String tipoRiego, boolean fichaCompleta, List<Titular> titulares, List<Cultivo> cultivos,
                              List<Crianza> crianzas, List<Actuacion> historial, List<Censo> censos, List<Conteo> conteos) { public Expediente { titulares=emptyIfNull(titulares); cultivos=emptyIfNull(cultivos); crianzas=emptyIfNull(crianzas); historial=emptyIfNull(historial); censos=emptyIfNull(censos); conteos=emptyIfNull(conteos); } }
     private static <T> List<T> emptyIfNull(List<T> values) { return values == null ? List.of() : List.copyOf(values); }

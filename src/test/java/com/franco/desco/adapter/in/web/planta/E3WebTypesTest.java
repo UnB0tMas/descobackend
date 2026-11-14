@@ -22,6 +22,16 @@ class E3WebTypesTest {
     }
 
     @Test
+    void loteSinParcelaEsValidoPeroParcelaCeroNo() {
+        var sinParcela = new E3WebTypes.Lote(List.of(
+                new E3WebTypes.Fila(1L, 10, null)), null);
+        var conCero = new E3WebTypes.Lote(List.of(
+                new E3WebTypes.Fila(1L, 10, 0L)), null);
+        assertThat(validator.validate(sinParcela)).isEmpty();
+        assertThat(validator.validate(conCero)).isNotEmpty();
+    }
+
+    @Test
     void rechazaCantidadInvalidaAntesDeConsultarBD() {
         var solicitud = new E3WebTypes.Lote(List.of(new E3WebTypes.Fila(1L, 0, null)), null);
         assertThat(validator.validate(solicitud)).isNotEmpty();
@@ -38,7 +48,7 @@ class E3WebTypesTest {
 
     @Test
     void fichaProgressivaNoRequiereEdadNiProduccion() {
-        var ficha = new E3WebTypes.Ficha(null, null, 0L);
+        var ficha = new E3WebTypes.Ficha(null, null, null, null, 0L);
         assertThat(validator.validate(ficha)).isEmpty();
     }
 

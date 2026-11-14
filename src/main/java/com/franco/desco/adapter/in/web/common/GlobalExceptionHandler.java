@@ -7,6 +7,7 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +45,16 @@ public class GlobalExceptionHandler {
             MethodArgumentNotValidException exception,
             HttpServletRequest request
     ) {
+        // El detalle de validación se conserva en el backend para diagnóstico por correlación.
+        // No registrar el cuerpo ni valores rechazados: pueden contener datos personales.
+        log.warn("Validación de solicitud fallida. correlationId={} metodo={} endpoint={} campos={}",
+                CorrelationIdFilter.correlationId(request), request.getMethod(), request.getRequestURI(),
+                exception.getBindingResult().getAllErrors().stream()
+                        .map(issue -> issue instanceof FieldError field
+                                ? field.getField() + " [" + field.getCode() + "]: " + field.getDefaultMessage()
+                                : issue.getObjectName() + " [" + issue.getCode() + "]: " + issue.getDefaultMessage())
+                        .toList());
+
         String message = exception
                 .getBindingResult()
                 .getAllErrors()
@@ -62,7 +73,9 @@ public class GlobalExceptionHandler {
         return error(
                 HttpStatus.BAD_REQUEST,
                 "SOLICITUD_NO_VALIDA",
-                message,
+                request.getRequestURI().startsWith("/api/v1/apappss/plantas")
+                        ? "Revise los datos ingresados de la planta e inténtelo nuevamente."
+                        : message,
                 request
         );
     }
@@ -72,6 +85,12 @@ public class GlobalExceptionHandler {
             ConstraintViolationException exception,
             HttpServletRequest request
     ) {
+        log.warn("Validación de parámetros fallida. correlationId={} metodo={} endpoint={} restricciones={}",
+                CorrelationIdFilter.correlationId(request), request.getMethod(), request.getRequestURI(),
+                exception.getConstraintViolations().stream()
+                        .map(issue -> issue.getPropertyPath() + ": " + issue.getMessage())
+                        .toList());
+
         String message = exception
                 .getConstraintViolations()
                 .stream()
@@ -87,7 +106,9 @@ public class GlobalExceptionHandler {
         return error(
                 HttpStatus.BAD_REQUEST,
                 "SOLICITUD_NO_VALIDA",
-                message,
+                request.getRequestURI().startsWith("/api/v1/apappss/plantas")
+                        ? "Revise los datos ingresados de la planta e inténtelo nuevamente."
+                        : message,
                 request
         );
     }
@@ -216,6 +237,29 @@ public class GlobalExceptionHandler {
                 ),
                 request
         );
+    }
+
+    @ExceptionHandler(HttpMessageNotWritableException.class)
+    public ResponseEntity<ApiResponse<Void>> responseNotWritable(
+            HttpMessageNotWritableException exception,
+            HttpServletRequest request
+    ) {
+        Throwable cause = exception;
+        while (cause != null) {
+            // Tomcat identifica una conexión cerrada por el cliente: no es un fallo de JSON ni SQL.
+            if ("org.apache.catalina.connector.ClientAbortException".equals(cause.getClass().getName())) {
+                log.debug(
+                        "El cliente cerró la conexión durante la respuesta. correlationId={} endpoint={}",
+                        CorrelationIdFilter.correlationId(request),
+                        request.getRequestURI()
+                );
+                // La respuesta ya no se puede escribir: no intentar devolver otro JSON ni un 500.
+                return null;
+            }
+            cause = cause.getCause();
+        }
+        // Los errores reales de serialización mantienen el tratamiento y la trazabilidad existentes.
+        return generic(exception, request);
     }
 
     @ExceptionHandler(Exception.class)

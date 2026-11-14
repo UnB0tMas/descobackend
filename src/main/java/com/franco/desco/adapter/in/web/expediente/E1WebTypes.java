@@ -77,7 +77,7 @@ public final class E1WebTypes {
     @Schema(name="E1ConteoResponse") public record Conteo(Long id,Long crianzaId,Integer cantidad,LocalDate fechaHecho,String observacion) {}
     @Schema(name="E1ExpedienteResponse")
     public record Expediente(Long predioId,String codigo,String nombre,String distritoCodigo,String referencia,
-        BigDecimal latitud,BigDecimal longitud,BigDecimal areaTotalHa,BigDecimal areaCultivableHa,String tipoRiego,
+        Long centroPobladoId,String centroPoblado,BigDecimal latitud,BigDecimal longitud,BigDecimal areaTotalHa,BigDecimal areaCultivableHa,String tipoRiego,
         boolean fichaCompleta,List<Titular> titulares,List<Cultivo> cultivos,List<Crianza> crianzas,
         List<Actuacion> historial,List<Censo> censos,List<Conteo> conteos) {}
 }

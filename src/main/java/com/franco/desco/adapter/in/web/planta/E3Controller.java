@@ -18,6 +18,10 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.json.JsonMapper;
+import java.time.LocalDate;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/apappss/plantas")
 @Tag(name="Plantas de palta",description="Expediente vegetal individual por UOT y convenio")
@@ -42,6 +46,31 @@ public class E3Controller {
   return execute(action,uotId,convenioId,predioId,plantaId,null,null,null,null,null,data,
    E3Models.Operation.class,E3WebTypes.Operacion.class,auth,request);
  }
+ @GetMapping("/resumen")
+ @Operation(operationId="apappssPlantasResumen",summary="Resumen de plantas con periodo y estado")
+ @PreAuthorize("@permissionGuard.has(authentication,'APAPPSS_PREDIOS_VER')")
+ public ResponseEntity<ApiResponse<E3WebTypes.Estadisticas>> resumen(
+    @RequestParam @Positive Long uotId,@RequestParam @Positive Long convenioId,
+    @RequestParam @Positive Long predioId,@RequestParam LocalDate desde,@RequestParam LocalDate hasta,
+    @RequestParam(required=false) String estado,@RequestParam(required=false) @Positive Long parcelaCultivoId,
+    @Parameter(hidden=true) JwtAuthenticationToken auth,@Parameter(hidden=true) HttpServletRequest request){
+  return execute("RESUMEN",uotId,convenioId,predioId,null,null,estado,null,null,null,
+    parcelaCultivoId==null?Map.of("desde",desde.toString(),"hasta",hasta.toString()):
+       Map.of("desde",desde.toString(),"hasta",hasta.toString(),"parcelaCultivoId",parcelaCultivoId),
+    E3Models.Stats.class,E3WebTypes.Estadisticas.class,auth,request);
+ }
+ @GetMapping("/{plantaId}/resumen")
+ @Operation(operationId="apappssPlantaResumen",summary="Evolución sanitaria individual por periodo")
+ @PreAuthorize("@permissionGuard.has(authentication,'APAPPSS_PREDIOS_VER')")
+ public ResponseEntity<ApiResponse<E3WebTypes.Estadisticas>> resumenIndividual(
+    @PathVariable @Positive Long plantaId,
+    @RequestParam @Positive Long uotId,@RequestParam @Positive Long convenioId,
+    @RequestParam @Positive Long predioId,@RequestParam LocalDate desde,@RequestParam LocalDate hasta,
+    @Parameter(hidden=true) JwtAuthenticationToken auth,@Parameter(hidden=true) HttpServletRequest request){
+  return execute("RESUMEN",uotId,convenioId,predioId,plantaId,null,null,null,null,null,
+    Map.of("desde",desde.toString(),"hasta",hasta.toString()),
+    E3Models.Stats.class,E3WebTypes.Estadisticas.class,auth,request);
+ }
  @GetMapping("/catalogos")
  @Operation(operationId="apappssPlantasCatalogos",summary="Variedades, diagnósticos y parcelas válidos")
  @PreAuthorize("@permissionGuard.has(authentication,'APAPPSS_PREDIOS_VER')")
@@ -57,9 +86,11 @@ public class E3Controller {
  public ResponseEntity<ApiResponse<E3WebTypes.Pagina>> listar(@RequestParam @Positive Long uotId,@RequestParam @Positive Long convenioId,
    @RequestParam @Positive Long predioId,@RequestParam(required=false) String buscar,
    @RequestParam(required=false) String estado,@RequestParam(required=false) Long variedadId,
+   @RequestParam(required=false) @Positive Long parcelaCultivoId,
    @RequestParam(defaultValue="1") @Min(1) Integer pagina,@RequestParam(defaultValue="20") @Min(1) @Max(100) Integer tamano,
    @Parameter(hidden=true) JwtAuthenticationToken auth,@Parameter(hidden=true) HttpServletRequest request){
-  return execute("LISTAR",uotId,convenioId,predioId,null,buscar,estado,variedadId,pagina,tamano,null,
+  return execute("LISTAR",uotId,convenioId,predioId,null,buscar,estado,variedadId,pagina,tamano,
+   parcelaCultivoId==null?null:Map.of("parcelaCultivoId",parcelaCultivoId),
    E3Models.Page.class,E3WebTypes.Pagina.class,auth,request);
  }
  @GetMapping("/{plantaId}")
@@ -147,7 +178,7 @@ public class E3Controller {
    @RequestParam @Positive Long uotId,@RequestParam @Positive Long convenioId,
    @RequestParam @Positive Long predioId,@Valid @RequestBody E3WebTypes.Medicion body,
    @Parameter(hidden=true) JwtAuthenticationToken auth,@Parameter(hidden=true) HttpServletRequest request){
-  return update("MEDIR",uotId,convenioId,predioId,plantaId,body,auth,request);
+  throw new ResponseStatusException(HttpStatus.GONE,"La materia seca se registra por fundo.");
  }
  @PostMapping("/{plantaId}/evidencias") @IdempotentOperation
  @Operation(operationId="apappssPlantaVincularEvidencia",summary="Asociar documento existente de predio a planta")

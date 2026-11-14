@@ -1,6 +1,7 @@
 package com.franco.desco.adapter.in.web.e5;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.util.List;
@@ -9,6 +10,14 @@ public final class E5WebTypes {
     private E5WebTypes() {}
     @Schema(name="E5ObservacionRequest")
     public record Observacion(@NotBlank @Size(max=500) String motivo) {}
+    @Schema(name="E5RepartoCuotaRequest")
+    public record RepartoCuota(@NotNull @Positive Long participacionId,
+        @NotNull @DecimalMin("0.01") @Digits(integer=17,fraction=2) BigDecimal monto) {}
+    @Schema(name="E5RepartoRequest")
+    public record RepartoRequest(List<@Valid RepartoCuota> cuotas) {}
+    @Schema(name="E5RepartoRectificacionRequest")
+    public record RepartoRectificacion(@NotBlank @Size(max=500) String motivo,
+        List<@Valid RepartoCuota> cuotas) {}
     @Schema(name="E5RectificacionRequest")
     public record Rectificacion(@NotBlank @Size(max=500) String motivoRectificacion) {}
     @Schema(name="E5PagoRequest")
@@ -19,7 +28,7 @@ public final class E5WebTypes {
         boolean excepcionAutorizada,@Size(max=800) String motivoExcepcion) {}
     @Schema(name="E5SocioBalanceResponse")
     public record SocioBalance(Long participacionId,Long socioId,String socio,BigDecimal kilogramos,
-        Long liquidacionId,Integer version,String liquidacionEstado,BigDecimal neto,BigDecimal pagado,BigDecimal saldo) {}
+        Long liquidacionId,Integer version,String liquidacionEstado,BigDecimal neto,BigDecimal pagado,BigDecimal saldo,BigDecimal bruto,BigDecimal ventaEfectiva,BigDecimal gastos,BigDecimal cargos,Boolean requiereRegeneracion) {}
     @Schema(name="E5VariedadBalanceResponse")
     public record VariedadBalance(Short variedadId,Long condicionId,BigDecimal kilogramos,
         BigDecimal bruto,BigDecimal efectivo) {}
@@ -34,7 +43,7 @@ public final class E5WebTypes {
         List<RepartoResumen> repartos) {}
     @Schema(name="E5GastoResponse")
     public record Gasto(Long gastoId,String concepto,BigDecimal importe,String moneda,String estado,
-        String fecha,Long repartoId,Integer version,String repartoEstado,Integer vendedores) {}
+        String fecha,Long repartoId,Integer version,String repartoEstado,Integer vendedores,String reglaCodigo) {}
     @Schema(name="E5GastosResponse")
     public record Gastos(Long campaniaId,List<Gasto> gastos) {}
     @Schema(name="E5CuotaResponse")

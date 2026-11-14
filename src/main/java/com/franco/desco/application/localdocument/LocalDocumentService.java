@@ -58,7 +58,14 @@ public class LocalDocumentService {
         }
         // Los técnicos pueden adjuntar evidencia a su salida aunque no administren el archivo general.
         boolean salida = "SALIDA".equalsIgnoreCase(targetType);
-        if (!uot.hasPermission(identity, uotId, salida ? "SALIDAS_EDITAR" : "ARCHIVOS_CREAR"))
+        boolean expedientePlanta = "PREDIO".equalsIgnoreCase(targetType)
+                && uot.hasPermission(identity, uotId, "APAPPSS_PREDIOS_EDITAR");
+        // Comprobante E5 en preparación: se vincula solo al confirmar el pago.
+        boolean comprobantePago = "NINGUNO".equalsIgnoreCase(targetType)
+                && "COMPROBANTE".equalsIgnoreCase(category)
+                && uot.hasPermission(identity, uotId, "APAPPSS_PAGOS_PAGAR");
+        if (!expedientePlanta && !comprobantePago
+                && !uot.hasPermission(identity, uotId, salida ? "SALIDAS_EDITAR" : "ARCHIVOS_CREAR"))
             return forbidden("No tiene permiso para registrar este documento.");
         String normalizedCategory;
         try {
@@ -209,7 +216,34 @@ public class LocalDocumentService {
                 identity.usuarioId(),identity.usuarioId());
             return allowed != null && allowed > 0;
         }
+        if (uot.hasPermission(identity, info.uotId(), "APAPPSS_PAGOS_VER")) {
+            Integer comprobante = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM finanzas.PagoBeneficiarioE5 B
+                JOIN finanzas.PagoSocio PS ON PS.pago_socio_id=B.pago_socio_id
+                JOIN finanzas.LiquidacionSocio L ON L.liquidacion_socio_id=PS.liquidacion_socio_id
+                JOIN comercial.ParticipacionCampaniaSocio PC ON PC.participacion_campania_socio_id=L.participacion_campania_socio_id
+                JOIN comercial.CampaniaVenta C ON C.campania_venta_id=PC.campania_venta_id
+                WHERE B.comprobante_archivo_id=? AND C.uot_id=? AND C.estado=1
+                """, Integer.class, info.fileId(), info.uotId());
+            if (comprobante!=null && comprobante>0) return true;
+        }
         if (uot.hasPermission(identity, info.uotId(), "ARCHIVOS_VER")) return true;
+        // Lectura puntual del documento vinculado a este expediente; no habilita
+        // la descarga de documentos ajenos al predio o a otra UOT.
+        if (uot.hasPermission(identity, info.uotId(), "APAPPSS_PREDIOS_VER")) {
+            Integer permitido = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM prod.PlantaPaltaE3 P
+                JOIN prod.PredioAmbito PA ON PA.predio_id=P.predio_id AND PA.uot_id=P.uot_id AND PA.estado=1
+                WHERE P.uot_id=?
+                  AND (EXISTS(SELECT 1 FROM prod.PlantaEvidenciaE3 E
+                      WHERE E.planta_id=P.planta_id AND E.archivo_id=?)
+                   OR EXISTS(SELECT 1 FROM sanidad.EpisodioPlantaE3 E
+                      JOIN sanidad.TratamientoAplicacionE4 T ON T.episodio_id=E.episodio_id
+                      JOIN sanidad.TratamientoArchivoE4 TA ON TA.aplicacion_id=T.aplicacion_id
+                      WHERE E.planta_id=P.planta_id AND TA.archivo_id=?))
+                """, Integer.class, info.uotId(), info.fileId(), info.fileId());
+            if (permitido != null && permitido > 0) return true;
+        }
 
         Integer allowed = jdbc.queryForObject(
                 """
@@ -245,6 +279,8 @@ public class LocalDocumentService {
         try {
             LocalDocumentModels.FileInfo info = getAnyInternal(fileId);
             if (info == null || !uot.hasPermission(identity, info.uotId(), "ARCHIVOS_RETIRAR")) return AppResult.error(AppStatus.NOT_FOUND, "ARCHIVO_NO_DISPONIBLE", "El archivo no está disponible.");
+            Integer usado = jdbc.queryForObject("SELECT COUNT(*) FROM finanzas.PagoBeneficiarioE5 WHERE comprobante_archivo_id=?", Integer.class, fileId);
+            if (usado!=null && usado>0) return badVoid("El comprobante pertenece a un pago confirmado.");
             PersistenceResult<Void> persistence = idempotency.executeVoid(identity.usuarioId(), idempotencyKey, "ARCHIVO_LOCAL_RETIRAR", "archivo", "Archivo", () -> {
                 jdbc.update("""
                         UPDATE archivo.Archivo SET estado=0,fecha_retiro=COALESCE(fecha_retiro,SYSUTCDATETIME()),
@@ -311,7 +347,9 @@ public class LocalDocumentService {
             case "PRODUCCION" -> new TechnicalTarget("disponibilidad_produccion_id","PRODUCCION_VER","SELECT P.predio_id FROM prod.DisponibilidadProduccion X JOIN prod.ParcelaCultivo C ON C.parcela_cultivo_id=X.parcela_cultivo_id JOIN prod.Parcela P ON P.parcela_id=C.parcela_id WHERE X.disponibilidad_produccion_id=? AND X.estado=1 AND X.estado_estimacion='ESTIMADA'");
             default -> throw new StorageFailure("Contexto no disponible.");
         };
-        if(!uot.hasPermission(identity,uotId,target.permission())) throw new StorageFailure("No tiene permiso para adjuntar evidencia en este contexto.");
+        if(!uot.hasPermission(identity,uotId,target.permission())
+                && !("PREDIO".equals(type) && uot.hasPermission(identity,uotId,"APAPPSS_PREDIOS_EDITAR")))
+            throw new StorageFailure("No tiene permiso para adjuntar evidencia en este contexto.");
         var predios=jdbc.queryForList(target.predioQuery(),Long.class,targetId);
         if(predios.size()!=1) throw new StorageFailure("El contexto no está disponible o ya está cerrado.");
         Integer matches=jdbc.queryForObject("SELECT COUNT(*) FROM prod.PredioAmbito WHERE predio_id=? AND uot_id=? AND estado=1 AND (convenio_uot_organizacion_id IS NULL OR seg.FN_Usuario_TienePermisoUOT(?,uot_id,'APAPPSS_PREDIOS_VER')=1)",Integer.class,predios.getFirst(),uotId,identity.usuarioId());

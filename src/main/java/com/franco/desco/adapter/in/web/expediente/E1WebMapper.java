@@ -111,6 +111,7 @@ public final class E1WebMapper {
     public E1WebTypes.Expediente response(E1Models.Expediente value) {
         return new E1WebTypes.Expediente(
                 value.predioId(), value.codigo(), value.nombre(), value.distritoCodigo(), value.referencia(),
+                value.centroPobladoId(), value.centroPoblado(),
                 value.latitud(), value.longitud(), value.areaTotalHa(), value.areaCultivableHa(),
                 value.tipoRiego(), value.fichaCompleta(),
                 value.titulares().stream().map(item -> new E1WebTypes.Titular(

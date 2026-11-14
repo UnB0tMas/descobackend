@@ -117,8 +117,9 @@ class E1ApplicationServiceTest {
     @Test
     void devuelveElExpedienteTipadoSinContratoGenerico() {
         var data = new E1Models.Expediente(
-                5L, "PRE-5", "Fundo", "050101", null, null, null,
-                null, null, null, false, java.util.List.of(), java.util.List.of(),
+                5L, "PRE-5", "Fundo", "050101", null,
+                null, null, null, null, null, null,
+                null, false, java.util.List.of(), java.util.List.of(),
                 java.util.List.of(), java.util.List.of(), java.util.List.of(), java.util.List.of()
         );
         when(persistence.getExpediente(any(), any(), any()))
