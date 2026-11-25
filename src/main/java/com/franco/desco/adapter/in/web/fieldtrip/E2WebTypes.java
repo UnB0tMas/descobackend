@@ -86,7 +86,7 @@ public final class E2WebTypes {
     @Schema(name="E2OperacionResponse") public record Operacion(Long salidaId,Long visitaId,String estado){}
     @Schema(name="E2OpcionResponse") public record Opcion(Long id,String nombre,String codigo){}
     @Schema(name="E2RecursoOpcionResponse")
-    public record RecursoOpcion(Long id,String tipo,String nombre,String codigo,String unidad,BigDecimal disponible){}
+    public record RecursoOpcion(Long id,String tipo,String nombre,String codigo,String unidad,BigDecimal disponible,BigDecimal disponibleTecnico,BigDecimal disponibleComercial){}
     @Schema(name="E2CatalogosResponse")
     public record Catalogos(List<Opcion> motivos,List<Opcion> tiposVisita,List<RecursoOpcion> bienes,List<Opcion> participantes){}
     @Schema(name="E2SalidaResumenResponse")
@@ -102,7 +102,7 @@ public final class E2WebTypes {
     @Schema(name="E2VisitaResponse")
     public record Visita(Long visitaId,Long destinoId,Long predioId,Instant fechaInicio,Instant fechaFin,String estado,
                          String objetivo,String resumen,String recomendaciones,String tipoVisita){}
-    @Schema(name="E2EventoResponse") public record Evento(Long eventoId,String tipo,String detalle,Long usuarioId,Instant fechaHora){}
+    @Schema(name="E2EventoResponse") public record Evento(Long eventoId,String tipo,String detalle,Long usuarioId,String usuarioNombre,Instant fechaHora){}
     @Schema(name="E2SalidaDetalleResponse")
     public record Detalle(Long salidaId,String nombre,String estado,Long uotId,Long convenioId,
            Long solicitanteEmpleadoId,Instant fechaSolicitud,Integer motivoSalidaId,String descripcion,

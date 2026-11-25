@@ -25,12 +25,20 @@ public final class DocumentSqlServerAdapter
 
     @Override
     public PersistenceResult<PageResult<DocumentModels.Summary>> list(ListDocuments command, SessionIdentity identity, RequestMetadata metadata) {
-        return page("archivo.PA_Archivo_Sel_Listado", command, identity, metadata, DocumentModels.Summary.class);
+        var page = page("archivo.PA_Archivo_Sel_Listado", command, identity, metadata, DocumentModels.Summary.class);
+        if (!page.exitoso() || page.datos() == null) return page;
+        var before = page.datos();
+        var safe = before.items().stream().filter(item -> !"CORRESPONDENCIA".equals(item.categoria())).toList();
+        return PersistenceResult.ok(page.codigo(), page.mensaje(), page.httpSugerido(),
+                new PageResult<>(safe, before.pagina(), before.tamanio(), before.totalRegistros(), before.totalPaginas()));
     }
 
     @Override
     public PersistenceResult<DocumentModels.Detail> get(GetDocument command, SessionIdentity identity, RequestMetadata metadata) {
-        return one("archivo.PA_Archivo_Sel_Detalle", command, identity, metadata, DocumentModels.Detail.class);
+        var result = one("archivo.PA_Archivo_Sel_Detalle", command, identity, metadata, DocumentModels.Detail.class);
+        if (result.exitoso() && result.datos() != null && "CORRESPONDENCIA".equals(result.datos().categoria()))
+            return PersistenceResult.error("ARCHIVO_NO_DISPONIBLE", "Archivo no disponible en este módulo.", 404);
+        return result;
     }
 
     @Override

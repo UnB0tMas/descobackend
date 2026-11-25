@@ -43,6 +43,22 @@ public class GpController {
     return ResponseEntity.status(201).body(new ApiResponse<>(true,"GP_CREADO","Registro guardado.",
        new GpWebTypes.Id(id),CorrelationIdFilter.correlationId(r),Instant.now()));
   }
+  @GetMapping("/productores/{personaId}/autorizacion-tecnica")
+  @Operation(operationId="gpAutorizacionProductorConsultar",summary="Consultar autorización para modificar un productor")
+  @PreAuthorize("@permissionGuard.has(authentication,'PREDIOS_VER') or @permissionGuard.has(authentication,'PREDIOS_LISTAR')")
+  public ResponseEntity<ApiResponse<Boolean>> autorizacionProductor(@RequestParam @Positive long uotId,
+      @PathVariable @Positive long personaId,@Parameter(hidden=true) JwtAuthenticationToken a,
+      @Parameter(hidden=true) HttpServletRequest r) {
+    return ok(db.puedeActuarProductor(user(a),uotId,personaId),r);
+  }
+  @GetMapping("/predios/{predioId}/autorizacion-tecnica")
+  @Operation(operationId="gpAutorizacionTecnicaConsultar",summary="Consultar autorización vigente para actuaciones del predio")
+  @PreAuthorize("@permissionGuard.has(authentication,'PREDIOS_VER') or @permissionGuard.has(authentication,'CULTIVOS_VER')")
+  public ResponseEntity<ApiResponse<Boolean>> autorizacionTecnica(@RequestParam @Positive long uotId,
+      @PathVariable @Positive long predioId,@Parameter(hidden=true) JwtAuthenticationToken a,
+      @Parameter(hidden=true) HttpServletRequest r) {
+    return ok(db.puedeActuar(user(a),uotId,predioId),r);
+  }
   @GetMapping("/predios/{predioId}/parcelas")
   @Operation(operationId="gpParcelasListar")
   @PreAuthorize("@permissionGuard.has(authentication,'CULTIVOS_LISTAR')")
@@ -170,6 +186,13 @@ public class GpController {
   public ResponseEntity<ApiResponse<GpWebTypes.Id>> aplicarTratamiento(@RequestParam @Positive long uotId,@PathVariable @Positive long id,
     @Valid @RequestBody GpWebTypes.TratamientoAplicar q,@Parameter(hidden=true) JwtAuthenticationToken a,@Parameter(hidden=true) HttpServletRequest r){
     return created(db.aplicarTratamiento(user(a),uotId,id,q,idempotency.required(r)),r);
+  }
+  @PostMapping("/tratamientos/{id}/eliminar") @IdempotentOperation
+  @Operation(operationId="gpIncidenciaTratamientoEliminar",summary="Retirar lógicamente un tratamiento de una incidencia abierta")
+  @PreAuthorize("@permissionGuard.has(authentication,'SANIDAD_RETIRAR')")
+  public ResponseEntity<ApiResponse<GpWebTypes.Id>> eliminarTratamiento(@RequestParam @Positive long uotId,@PathVariable @Positive long id,
+    @Valid @RequestBody GpWebTypes.Motivo q,@Parameter(hidden=true) JwtAuthenticationToken a,@Parameter(hidden=true) HttpServletRequest r){
+    return ok(new GpWebTypes.Id(db.eliminarTratamiento(user(a),uotId,id,q.motivo(),idempotency.required(r))),r);
   }
   @PostMapping("/tratamientos/{id}/finalizar") @IdempotentOperation
   @Operation(operationId="gpIncidenciaTratamientoFinalizar")

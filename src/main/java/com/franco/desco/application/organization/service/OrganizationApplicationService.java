@@ -8,15 +8,18 @@ import com.franco.desco.application.shared.AppStatus;
 import com.franco.desco.application.shared.ApplicationResults;
 import com.franco.desco.application.shared.RequestMetadata;
 import com.franco.desco.application.shared.SessionIdentity;
+import com.franco.desco.application.shared.service.EmailValidationService;
 import com.franco.desco.application.shared.pagination.PageResult;
 import com.franco.desco.domain.organization.OrganizationModels;
 
 public final class OrganizationApplicationService implements OrganizationUseCase {
 
     private final OrganizationPersistencePort persistence;
+    private final EmailValidationService emailValidation;
 
-    public OrganizationApplicationService(OrganizationPersistencePort persistence) {
+    public OrganizationApplicationService(OrganizationPersistencePort persistence, EmailValidationService emailValidation) {
         this.persistence = persistence;
+        this.emailValidation = emailValidation;
     }
 
     @Override
@@ -31,21 +34,29 @@ public final class OrganizationApplicationService implements OrganizationUseCase
 
     @Override
     public AppResult<Long> createCompany(CreateCompany command, SessionIdentity identity, RequestMetadata metadata) {
+        AppResult<Long> error = emailValidation.required(command.correo());
+        if (error != null) return error;
         return ApplicationResults.created(persistence.createCompany(command, identity, metadata), "EMPRESA_CREADA", "EMPRESA_NO_CREADA");
     }
 
     @Override
     public AppResult<Void> updateCompany(UpdateCompany command, SessionIdentity identity, RequestMetadata metadata) {
+        AppResult<Void> error = emailValidation.ifProvided(command.correo());
+        if (error != null) return error;
         return ApplicationResults.ok(persistence.updateCompany(command, identity, metadata), "EMPRESA_ACTUALIZADA", "EMPRESA_NO_ACTUALIZADA", AppStatus.BAD_REQUEST);
     }
 
     @Override
     public AppResult<Long> createAssociation(CreateAssociation command, SessionIdentity identity, RequestMetadata metadata) {
+        AppResult<Long> error = emailValidation.required(command.correo());
+        if (error != null) return error;
         return ApplicationResults.created(persistence.createAssociation(command, identity, metadata), "ASOCIACION_CREADA", "ASOCIACION_NO_CREADA");
     }
 
     @Override
     public AppResult<Void> updateAssociation(UpdateAssociation command, SessionIdentity identity, RequestMetadata metadata) {
+        AppResult<Void> error = emailValidation.ifProvided(command.correo());
+        if (error != null) return error;
         return ApplicationResults.ok(persistence.updateAssociation(command, identity, metadata), "ASOCIACION_ACTUALIZADA", "ASOCIACION_NO_ACTUALIZADA", AppStatus.BAD_REQUEST);
     }
 

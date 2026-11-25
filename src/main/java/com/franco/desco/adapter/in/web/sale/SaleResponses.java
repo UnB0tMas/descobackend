@@ -49,7 +49,8 @@ public final class SaleResponses {
             String numeroOperacion,
             LocalDateTime fechaHora,
             Long usuarioId,
-            String estadoPago
+            String estadoPago,
+            Long archivoId
     ) {}
 
     @Schema(name = "SaleReceiptResponse")

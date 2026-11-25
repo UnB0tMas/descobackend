@@ -47,7 +47,7 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
         try {
             List<ResourceModels.Asset> values = jdbc.query("""
                     SELECT B.bien_inventario_id,B.uot_id,U.codigo uot_codigo,U.nombre uot_nombre,B.tipo_bien_id,T.nombre tipo_bien,
-                           B.codigo_patrimonial,B.nombre,B.marca,B.modelo,B.serie,B.estado_bien,B.fecha_adquisicion,B.monto_adquisicion,
+                           B.codigo_patrimonial,B.nombre,B.marca,B.modelo,B.serie,B.estado_bien,B.permite_salida_tecnica,B.fecha_adquisicion,B.monto_adquisicion,
                            B.moneda_adquisicion,B.proveedor_persona_id,B.proveedor_empresa_id,B.observacion,B.estado,
                            (SELECT TOP(1) BI.archivo_id FROM logistica.BienImagen BI WHERE BI.bien_inventario_id=B.bien_inventario_id AND BI.estado=1 ORDER BY BI.es_principal DESC,BI.orden,BI.bien_imagen_id) imagen_id,
                            (SELECT COUNT(*) FROM logistica.BienIncidente I WHERE I.bien_inventario_id=B.bien_inventario_id AND I.estado=1 AND I.estado_incidente IN('ABIERTO','EN_ATENCION')) incidentes_abiertos
@@ -68,7 +68,7 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
         try {
             List<ResourceModels.Asset> assets = jdbc.query("""
                     SELECT B.bien_inventario_id,B.uot_id,U.codigo uot_codigo,U.nombre uot_nombre,B.tipo_bien_id,T.nombre tipo_bien,
-                           B.codigo_patrimonial,B.nombre,B.marca,B.modelo,B.serie,B.estado_bien,B.fecha_adquisicion,B.monto_adquisicion,
+                           B.codigo_patrimonial,B.nombre,B.marca,B.modelo,B.serie,B.estado_bien,B.permite_salida_tecnica,B.fecha_adquisicion,B.monto_adquisicion,
                            B.moneda_adquisicion,B.proveedor_persona_id,B.proveedor_empresa_id,B.observacion,B.estado,
                            (SELECT TOP(1) BI.archivo_id FROM logistica.BienImagen BI WHERE BI.bien_inventario_id=B.bien_inventario_id AND BI.estado=1 ORDER BY BI.es_principal DESC,BI.orden,BI.bien_imagen_id) imagen_id,
                            (SELECT COUNT(*) FROM logistica.BienIncidente I WHERE I.bien_inventario_id=B.bien_inventario_id AND I.estado=1 AND I.estado_incidente IN('ABIERTO','EN_ATENCION')) incidentes_abiertos
@@ -93,7 +93,7 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
     public PersistenceResult<Long> createAsset(SessionIdentity identity, ResourceCommands.CreateAsset command) {
         if (!uot.hasPermission(identity, command.uotId(), "INVENTARIO_CREAR")) return PersistenceResult.error("No tiene permiso para registrar recursos en esa UOT.");
         if (command.idempotencyKey() == null) return PersistenceResult.error("La clave de idempotencia es obligatoria.");
-        if (!validAssetProvider(command.providerPersonId(),command.providerCompanyId())) return PersistenceResult.error("Seleccione una empresa activa de Administración como proveedor.");
+        if (!validAssetProvider(command.providerPersonId(),command.providerCompanyId(),command.uotId(),null)) return PersistenceResult.error("Seleccione un proveedor activo en esta unidad.");
         return idempotency.executeLong(identity.usuarioId(), command.idempotencyKey(),
                 "BIEN_UOT_CREAR", "logistica", "BienInventario", () -> {
             Long companyId = compatibilityCompany(command.uotId());
@@ -108,12 +108,12 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
             Long assetId = jdbc.queryForObject("""
                     DECLARE @creado TABLE (id BIGINT);
                     INSERT logistica.BienInventario(empresa_id,uot_id,tipo_bien_id,codigo_patrimonial,nombre,marca,modelo,serie,estado_bien,estado,
-                      fecha_adquisicion,monto_adquisicion,moneda_adquisicion,proveedor_persona_id,proveedor_empresa_id,observacion)
-                    OUTPUT INSERTED.bien_inventario_id INTO @creado VALUES(?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?);
+                      fecha_adquisicion,monto_adquisicion,moneda_adquisicion,proveedor_persona_id,proveedor_empresa_id,observacion,permite_salida_tecnica)
+                    OUTPUT INSERTED.bien_inventario_id INTO @creado VALUES(?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?);
                     SELECT id FROM @creado;
                     """, Long.class, companyId, command.uotId(), command.assetTypeId(), code,
                     required(command.name(), "El nombre del bien es obligatorio."), trim(command.brand()), trim(command.model()), trim(command.serial()), initialState,
-                    command.acquisitionDate(), command.acquisitionAmount(), currency(command.currency()), command.providerPersonId(), command.providerCompanyId(), trim(command.observation()));
+                    command.acquisitionDate(), command.acquisitionAmount(), currency(command.currency()), command.providerPersonId(), command.providerCompanyId(), trim(command.observation()), Boolean.TRUE.equals(command.technicalUse()));
             if (assetId == null) throw new BusinessFailure("No se pudo obtener el recurso registrado.");
             jdbc.update("INSERT logistica.BienEstadoHistorial(bien_inventario_id,estado_bien,fecha_desde,motivo,usuario_id,estado) VALUES(?,?,SYSUTCDATETIME(),N'Registro inicial.',?,1)", assetId, initialState, identity.usuarioId());
             if (command.vehicle() != null) saveVehicle(identity, assetId, command.vehicle());
@@ -126,15 +126,15 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
         Long assetUot = assetUot(command.assetId());
         if (assetUot == null) return PersistenceResult.error("El recurso no está disponible.");
         if (!uot.hasPermission(identity, assetUot, "INVENTARIO_EDITAR")) return PersistenceResult.error("No tiene permiso para modificar el recurso.");
-        if (!validAssetProvider(command.providerPersonId(),command.providerCompanyId())) return PersistenceResult.error("Seleccione una empresa activa de Administración como proveedor.");
+        if (!validAssetProvider(command.providerPersonId(),command.providerCompanyId(),assetUot,command.assetId())) return PersistenceResult.error("Seleccione un proveedor activo en esta unidad.");
         try {
             return transaction.execute(status -> {
                 validateVehicleType(command.assetTypeId(), command.vehicle());
                 int changed = jdbc.update("""
                         UPDATE logistica.BienInventario SET tipo_bien_id=?,nombre=?,marca=?,modelo=?,serie=?,fecha_adquisicion=?,monto_adquisicion=?,
-                        moneda_adquisicion=?,proveedor_persona_id=?,proveedor_empresa_id=?,observacion=? WHERE bien_inventario_id=? AND estado=1
+                        moneda_adquisicion=?,proveedor_persona_id=?,proveedor_empresa_id=?,observacion=?,permite_salida_tecnica=? WHERE bien_inventario_id=? AND estado=1
                         """, command.assetTypeId(), required(command.name(), "El nombre del bien es obligatorio."), trim(command.brand()), trim(command.model()), trim(command.serial()),
-                        command.acquisitionDate(), command.acquisitionAmount(), currency(command.currency()), command.providerPersonId(), command.providerCompanyId(), trim(command.observation()), command.assetId());
+                        command.acquisitionDate(), command.acquisitionAmount(), currency(command.currency()), command.providerPersonId(), command.providerCompanyId(), trim(command.observation()), Boolean.TRUE.equals(command.technicalUse()), command.assetId());
                 if (changed != 1) return PersistenceResult.error("El recurso no está disponible.");
                 if (command.vehicle() != null) saveVehicle(identity, command.assetId(), command.vehicle());
                 return PersistenceResult.ok("Recurso actualizado correctamente.", null);
@@ -144,10 +144,29 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
         }
     }
 
-    private boolean validAssetProvider(Long personId,Long companyId) {
-        if(personId!=null)return false;
-        if(companyId==null)return true;
-        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT CONVERT(BIT,CASE WHEN EXISTS(SELECT 1 FROM org.Empresa E WHERE E.empresa_id=? AND E.estado=1 AND NOT EXISTS(SELECT 1 FROM org.Asociacion A WHERE A.asociacion_id=E.empresa_id)) THEN 1 ELSE 0 END)",Boolean.class,companyId));
+    private boolean validAssetProvider(Long personId, Long companyId, Long uotId, Long assetId) {
+        if (personId != null && companyId != null) return false;
+        if (personId == null && companyId == null) return true;
+        Boolean assigned = jdbc.queryForObject("""
+            SELECT CONVERT(BIT, CASE WHEN EXISTS (
+                SELECT 1 FROM org.ProveedorUOT P WITH (NOLOCK)
+                LEFT JOIN org.Persona R WITH (NOLOCK) ON R.persona_id = P.persona_id
+                LEFT JOIN org.Empresa E WITH (NOLOCK) ON E.empresa_id = P.empresa_id
+                WHERE P.uot_id = ? AND P.estado = 1 AND
+                      ((P.persona_id = ? AND R.estado = 1) OR (P.empresa_id = ? AND E.estado = 1))
+            ) THEN 1 ELSE 0 END)
+            """, Boolean.class, uotId, personId, companyId);
+        if (Boolean.TRUE.equals(assigned)) return true;
+        if (assetId == null) return false;
+        // Bienes históricos mantienen su referencia hasta que se actualice el proveedor.
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            SELECT CONVERT(BIT, CASE WHEN EXISTS (
+                SELECT 1 FROM logistica.BienInventario B WITH (NOLOCK)
+                WHERE B.bien_inventario_id = ? AND B.uot_id = ?
+                  AND ((B.proveedor_persona_id = ? AND ? IS NOT NULL)
+                       OR (B.proveedor_empresa_id = ? AND ? IS NOT NULL))
+            ) THEN 1 ELSE 0 END)
+            """, Boolean.class, assetId, uotId, personId, personId, companyId, companyId));
     }
 
     private void validateVehicleType(Integer typeId, ResourceCommands.VehicleData vehicle) {
@@ -367,7 +386,7 @@ public class SqlServerResourcePersistenceAdapter implements ResourcePersistenceP
         return ids.isEmpty()||ids.getFirst()==0?null:ids.getFirst();
     }
 
-    private static ResourceModels.Asset assetRow(java.sql.ResultSet rs)throws java.sql.SQLException{return new ResourceModels.Asset(rs.getLong("bien_inventario_id"),rs.getLong("uot_id"),rs.getString("uot_codigo"),rs.getString("uot_nombre"),rs.getInt("tipo_bien_id"),rs.getString("tipo_bien"),rs.getString("codigo_patrimonial"),rs.getString("nombre"),rs.getString("marca"),rs.getString("modelo"),rs.getString("serie"),rs.getString("estado_bien"),localDate(rs,"fecha_adquisicion"),rs.getBigDecimal("monto_adquisicion"),rs.getString("moneda_adquisicion"),nullableLong(rs,"proveedor_persona_id"),nullableLong(rs,"proveedor_empresa_id"),rs.getString("observacion"),nullableLong(rs,"imagen_id"),rs.getInt("incidentes_abiertos"),rs.getBoolean("estado"));}
+    private static ResourceModels.Asset assetRow(java.sql.ResultSet rs)throws java.sql.SQLException{return new ResourceModels.Asset(rs.getLong("bien_inventario_id"),rs.getLong("uot_id"),rs.getString("uot_codigo"),rs.getString("uot_nombre"),rs.getInt("tipo_bien_id"),rs.getString("tipo_bien"),rs.getString("codigo_patrimonial"),rs.getString("nombre"),rs.getString("marca"),rs.getString("modelo"),rs.getString("serie"),rs.getString("estado_bien"),localDate(rs,"fecha_adquisicion"),rs.getBigDecimal("monto_adquisicion"),rs.getString("moneda_adquisicion"),nullableLong(rs,"proveedor_persona_id"),nullableLong(rs,"proveedor_empresa_id"),rs.getString("observacion"),nullableLong(rs,"imagen_id"),rs.getInt("incidentes_abiertos"),rs.getBoolean("estado"),rs.getBoolean("permite_salida_tecnica"));}
     private static PersistenceResult<Long> idResult(Map<String,Object> out,String key,String fallback){if(!SqlProcedureExecutor.success(out))return PersistenceResult.error(SqlProcedureExecutor.message(out,fallback));return PersistenceResult.ok(SqlProcedureExecutor.message(out,"Registro creado correctamente."),SqlProcedureExecutor.longValue(out,key));}
     private static PersistenceResult<Void> voidResult(Map<String,Object> out,String fallback){if(!SqlProcedureExecutor.success(out))return PersistenceResult.error(SqlProcedureExecutor.message(out,fallback));return PersistenceResult.ok(SqlProcedureExecutor.message(out,"Acción realizada."),null);}
     private static Map<String,Object> map(Object...p){Map<String,Object>m=new LinkedHashMap<>();for(int i=0;i<p.length;i+=2)m.put(String.valueOf(p[i]),p[i+1]);return m;}

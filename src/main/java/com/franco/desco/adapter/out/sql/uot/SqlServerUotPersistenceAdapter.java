@@ -37,9 +37,8 @@ public class SqlServerUotPersistenceAdapter implements UotPersistencePort {
             String mode = session == null || session.mode() == null ? "ESPECIFICA" : session.mode();
             Long selected = session == null ? null : session.uotId();
 
-            if ("ESPECIFICA".equals(mode) && selected == null && memberships.size() == 1) {
-                selected = memberships.getFirst().uotId();
-            }
+            // Solo una selección persistida en la sesión habilita permisos.
+            // El guard de Angular selecciona automáticamente la única UOT disponible.
             if (selected != null) {
                 Long selectedCandidate = selected;
                 if (memberships.stream().noneMatch(item -> Objects.equals(item.uotId(), selectedCandidate))) {
@@ -147,6 +146,22 @@ public class SqlServerUotPersistenceAdapter implements UotPersistencePort {
                 new SqlParameter("nUotId", Types.BIGINT), new SqlParameter("nRolId", Types.BIGINT),
                 new SqlOutParameter("bResultado", Types.BIT), new SqlOutParameter("cMensaje", Types.NVARCHAR));
         return voidResult(out, "No se pudo asignar el rol.");
+    }
+
+    @Override
+    public PersistenceResult<Void> assignAccess(UotCommands.AssignAccess command, SessionIdentity identity) {
+        Map<String, Object> out = procedures.call("seg", "PA_UsuarioUOT_Ins_AsignarAccesoCompleto", map(
+                        "nActorUsuarioId", identity.usuarioId(), "nUsuarioId", command.userId(),
+                        "nUotId", command.uotId(), "nRolId", command.roleId(),
+                        "bPredeterminada", command.defaultUnit()),
+                new SqlParameter("nActorUsuarioId", Types.BIGINT),
+                new SqlParameter("nUsuarioId", Types.BIGINT),
+                new SqlParameter("nUotId", Types.BIGINT),
+                new SqlParameter("nRolId", Types.BIGINT),
+                new SqlParameter("bPredeterminada", Types.BIT),
+                new SqlOutParameter("bResultado", Types.BIT),
+                new SqlOutParameter("cMensaje", Types.NVARCHAR));
+        return voidResult(out, "No se pudo asignar el acceso y el rol.");
     }
 
     @Override

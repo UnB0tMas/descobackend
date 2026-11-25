@@ -1,5 +1,6 @@
 package com.franco.desco.infrastructure.persistence.campaign;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.shared.PersistenceResult;
 import com.franco.desco.application.shared.RequestMetadata;
 import com.franco.desco.application.shared.SessionIdentity;
@@ -85,7 +86,7 @@ public class CampaignPlanningSqlAdapter {
         payload.put("datos", data == null ? Map.of() : data);
         String serialized = json.writeValueAsString(payload);
         try {
-            return jdbc.execute(connection -> {
+            return PaTrace.call("comercial." + procedure, () -> jdbc.execute(connection -> {
                 CallableStatement stmt = connection.prepareCall("{call comercial." + procedure + "(?,?,?,?,?,?)}");
                 stmt.setNString(1, serialized);
                 stmt.registerOutParameter(2, Types.LONGNVARCHAR);
@@ -105,7 +106,7 @@ public class CampaignPlanningSqlAdapter {
                 Map<String, Object> result = raw == null || raw.isBlank()
                         ? Map.of() : json.readValue(raw, new TypeReference<Map<String, Object>>() {});
                 return PersistenceResult.ok(code, message, http == 0 ? 200 : http, result);
-            });
+            }));
         } catch (DataAccessException ex) {
             return PersistenceResult.error("CAMPANIA_BD_NO_DISPONIBLE",
                     "No se pudo completar la operación comercial en este momento.", 503);

@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.sql.common;
 
+import com.franco.desco.adapter.out.sqlserver.shared.LoggedSimpleJdbcCall;
 import org.springframework.jdbc.core.SqlParameter;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
@@ -23,7 +24,7 @@ public class SqlProcedureExecutor {
             Map<String, ?> input,
             SqlParameter... parameters
     ) {
-        SimpleJdbcCall call = new SimpleJdbcCall(dataSource)
+        SimpleJdbcCall call = new LoggedSimpleJdbcCall(dataSource, schema + "." + procedure)
                 .withSchemaName(schema)
                 .withProcedureName(procedure)
                 .withoutProcedureColumnMetaDataAccess()

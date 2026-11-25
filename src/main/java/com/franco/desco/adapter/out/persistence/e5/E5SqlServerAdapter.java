@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.persistence.e5;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.e5.E5Commands;
 import com.franco.desco.application.e5.port.out.E5PersistencePort;
 import com.franco.desco.application.shared.*;
@@ -40,7 +41,7 @@ public final class E5SqlServerAdapter implements E5PersistencePort {
         payload.put("datos",command.datos()==null?Map.of():command.datos());
         String raw=json.writeValueAsString(payload);
         try {
-            return jdbc.execute(connection->{
+            return PaTrace.call(CALL, command.accion(), () -> jdbc.execute(connection->{
                 CallableStatement stmt=connection.prepareCall(CALL);
                 stmt.setString(1,command.accion());stmt.setNString(2,raw);
                 stmt.registerOutParameter(3,Types.LONGNVARCHAR);
@@ -56,7 +57,7 @@ public final class E5SqlServerAdapter implements E5PersistencePort {
                 String value=stmt.getNString(3);
                 T parsed=value==null||value.isBlank()?null:json.readValue(value,type);
                 return PersistenceResult.ok(stmt.getString(6),stmt.getNString(5),http==0?200:http,parsed);
-            });
+            }));
         } catch (DataAccessException ex) {
             return PersistenceResult.error("E5_BD_NO_DISPONIBLE",
                 "La operación financiera no pudo completarse en este momento.",503);

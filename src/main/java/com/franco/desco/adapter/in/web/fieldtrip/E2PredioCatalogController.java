@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.in.web.fieldtrip;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.adapter.in.security.JwtSessionIdentityResolver;
 import com.franco.desco.adapter.in.web.common.*;
 import com.franco.desco.adapter.in.web.openapi.OpenApiConstants;
@@ -39,9 +40,9 @@ public class E2PredioCatalogController {
             @Parameter(hidden=true) JwtAuthenticationToken a,
             @Parameter(hidden=true) HttpServletRequest r){
         try {
-            var rows=jdbc.query("EXEC campo.PA_SalidaDestino_Sel_Predios ?,?,?",
+            var rows=PaTrace.call("campo.PA_SalidaDestino_Sel_Predios", () -> jdbc.query("EXEC campo.PA_SalidaDestino_Sel_Predios ?,?,?",
                     (rs,n)->new Predio(rs.getLong("predioId"),rs.getString("codigo"),rs.getString("nombre")),
-                    identity.resolve(a).usuarioId(),uotId,buscar==null||buscar.isBlank()?null:buscar.trim());
+                    identity.resolve(a).usuarioId(),uotId,buscar==null||buscar.isBlank()?null:buscar.trim()));
             return responses.from(AppResult.ok("E2_PREDIOS_LISTADOS","Predios consultados.",rows),r);
         }catch(DataAccessException ex){
             return responses.from(AppResult.<List<Predio>>error(AppStatus.SERVICE_UNAVAILABLE,

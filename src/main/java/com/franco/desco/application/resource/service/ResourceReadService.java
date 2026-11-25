@@ -1,5 +1,6 @@
 package com.franco.desco.application.resource.service;
 
+import com.franco.desco.adapter.out.sqlserver.shared.LoggedSimpleJdbcCall;
 import com.franco.desco.application.shared.AppResult;
 import com.franco.desco.application.shared.AppStatus;
 import com.franco.desco.application.shared.SessionIdentity;
@@ -151,7 +152,7 @@ public class ResourceReadService {
                 date(rs,"fechaAdquisicion"), rs.getBigDecimal("montoAdquisicion"), rs.getString("monedaAdquisicion"),
                 nullableLong(rs,"proveedorPersonaId"), nullableLong(rs,"proveedorEmpresaId"), rs.getString("proveedorNombre"), rs.getString("observacion"),
                 rs.getString("placa"), rs.getString("tipoVehiculo"), rs.getBigDecimal("kilometrajeKm"), rs.getString("color"), nullableLong(rs,"archivoPrincipalId"),
-                rs.getInt("incidentesAbiertos"), rs.getBoolean("estado"), rs.getLong("totalRegistros"));
+                rs.getInt("incidentesAbiertos"), rs.getBoolean("estado"), rs.getBoolean("permiteSalidaTecnica"), rs.getLong("totalRegistros"));
     }
 
     private ResourceModels.ProductListItem mapProduct(ResultSet rs, int row) throws SQLException {
@@ -180,7 +181,7 @@ public class ResourceReadService {
         all[parameters.length+1]=new SqlOutParameter("cMensaje",Types.NVARCHAR);
         all[parameters.length+2]=new SqlOutParameter("cCodigoRespuesta",Types.VARCHAR);
         all[parameters.length+3]=new SqlOutParameter("nHttpRespuesta",Types.SMALLINT);
-        return new SimpleJdbcCall(ds).withSchemaName("logistica").withProcedureName(procedure).withoutProcedureColumnMetaDataAccess().declareParameters(all);
+        return new LoggedSimpleJdbcCall(ds, "logistica" + "." + procedure).withSchemaName("logistica").withProcedureName(procedure).withoutProcedureColumnMetaDataAccess().declareParameters(all);
     }
     private static SqlParameter in(String name,int type){return new SqlParameter(name,type);}
     @SuppressWarnings("unchecked") private static <T> List<T> list(Map<String,Object> out,String key){Object v=out.get(key);return v instanceof List<?> l?(List<T>)l:List.of();}

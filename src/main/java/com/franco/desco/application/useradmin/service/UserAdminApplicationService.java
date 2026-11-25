@@ -2,6 +2,7 @@ package com.franco.desco.application.useradmin.service;
 
 import com.franco.desco.application.auth.port.out.PasswordHashPort;
 import com.franco.desco.application.shared.*;
+import com.franco.desco.application.shared.service.EmailValidationService;
 import com.franco.desco.application.shared.pagination.PageResult;
 import com.franco.desco.application.useradmin.UserAdminCommands.*;
 import com.franco.desco.application.useradmin.port.in.UserAdminUseCase;
@@ -11,10 +12,13 @@ import com.franco.desco.domain.useradmin.UserAdminModels;
 public final class UserAdminApplicationService implements UserAdminUseCase {
     private final UserAdminPersistencePort persistence;
     private final PasswordHashPort passwordHash;
+    private final EmailValidationService emailValidation;
 
-    public UserAdminApplicationService(UserAdminPersistencePort persistence, PasswordHashPort passwordHash) {
+    public UserAdminApplicationService(UserAdminPersistencePort persistence, PasswordHashPort passwordHash,
+                                       EmailValidationService emailValidation) {
         this.persistence = persistence;
         this.passwordHash = passwordHash;
+        this.emailValidation = emailValidation;
     }
 
     public AppResult<PageResult<UserAdminModels.Summary>> list(ListUsers c, SessionIdentity i, RequestMetadata m) {
@@ -30,6 +34,8 @@ public final class UserAdminApplicationService implements UserAdminUseCase {
         return ApplicationResults.ok(persistence.updateSecurityPolicy(c,i,m), "POLITICA_SEGURIDAD_ACTUALIZADA", "POLITICA_SEGURIDAD_NO_ACTUALIZADA", AppStatus.BAD_REQUEST);
     }
     public AppResult<Long> create(CreateUser c, SessionIdentity i, RequestMetadata m) {
+        AppResult<Long> error = emailValidation.required(c.correoSeguridad());
+        if (error != null) return error;
         String hash = passwordHash.encode(c.passwordInicial());
         CreateUserPersist persisted = new CreateUserPersist(c.empleadoId(), c.nombreUsuario(), hash, c.correoSeguridad(), c.requiereCambioPassword(), c.rolIds());
         return ApplicationResults.created(persistence.create(persisted,i,m), "USUARIO_CREADO", "USUARIO_NO_CREADO");

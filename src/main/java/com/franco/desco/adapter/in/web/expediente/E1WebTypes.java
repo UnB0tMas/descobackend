@@ -11,7 +11,7 @@ import java.util.List;
 public final class E1WebTypes {
     private E1WebTypes() {}
     @Schema(name="E1PersonaRequest")
-    public record PersonaRequest(@NotBlank String tipoDocumento, @NotBlank String numeroDocumento,
+    public record PersonaRequest(@Positive Long personaId, @NotBlank String tipoDocumento, @NotBlank String numeroDocumento,
        String nombres,String apellidoPaterno,String apellidoMaterno,
        LocalDate fechaNacimiento,@Size(max=30) String telefono,@Email @Size(max=180) String correo,
        @Pattern(regexp="(?:\\d{6})?") String distritoCodigo,

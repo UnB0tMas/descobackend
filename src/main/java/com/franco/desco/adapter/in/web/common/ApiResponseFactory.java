@@ -4,6 +4,8 @@ import com.franco.desco.application.shared.AppResult;
 import com.franco.desco.application.shared.AppStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +15,7 @@ import java.util.function.Function;
 
 @Component
 public class ApiResponseFactory {
+    private static final Logger LOG = LoggerFactory.getLogger(ApiResponseFactory.class);
 
     public <S, T> ResponseEntity<ApiResponse<T>> from(
             AppResult<S> result,
@@ -38,8 +41,15 @@ public class ApiResponseFactory {
                         Instant.now()
                 );
 
+        HttpStatus status = toHttpStatus(result.estado());
+        if (!result.exitoso()) {
+            LOG.warn(">> [HTTP ERROR FUNCIONAL] status={} codigo={} mensaje={} "
+                            + "metodo={} endpoint={} correlacionId={}",
+                    status.value(), result.codigo(), result.mensaje(),
+                    request.getMethod(), request.getRequestURI(), correlationId);
+        }
         return ResponseEntity
-                .status(toHttpStatus(result.estado()))
+                .status(status)
                 .body(body);
     }
 

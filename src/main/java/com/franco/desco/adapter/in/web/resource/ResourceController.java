@@ -186,6 +186,7 @@ public class ResourceController {
                 body.proveedorPersonaId(),
                 body.proveedorEmpresaId(),
                 body.observacion(),
+                body.permiteSalidaTecnica(),
                 vehicleData(body.vehiculo()),
                 idempotency.required(request)
         );
@@ -226,6 +227,7 @@ public class ResourceController {
                 body.proveedorPersonaId(),
                 body.proveedorEmpresaId(),
                 body.observacion(),
+                body.permiteSalidaTecnica(),
                 vehicleData(body.vehiculo())
         );
 

@@ -74,13 +74,22 @@ public final class SanitationRequests {
             @Size(max = 30) String unidadDosis,
             @Size(max = 400) String observacion,
             @Positive Long programacionProductoId,
-            @Positive @Digits(integer=16,fraction=3) BigDecimal cantidadUtilizada
+            @Positive @Digits(integer=16,fraction=3) BigDecimal cantidadUtilizada,
+            @Positive Long salidaCampoId,
+            @Positive Long solicitudRecursoId,
+            @Size(max=20) String unidadUtilizada
     ) {
         @AssertTrue(message = "Seleccione el producto entregado y su cantidad utilizada.")
-        public boolean isConsumoCompleto() { return (programacionProductoId == null) == (cantidadUtilizada == null); }
+        public boolean isConsumoCompleto() {
+            if (salidaCampoId != null || solicitudRecursoId != null)
+                return salidaCampoId != null && solicitudRecursoId != null && visitaTecnicaId != null
+                        && programacionProductoId == null && cantidadUtilizada != null
+                        && unidadUtilizada != null && !unidadUtilizada.isBlank();
+            return (programacionProductoId == null) == (cantidadUtilizada == null);
+        }
 
         @AssertTrue(message = "La dosis y la unidad deben informarse juntas.")
-        public boolean dosisCompleta() {
+        public boolean isDosisCompleta() {
             boolean hasDose = dosis != null;
             boolean hasUnit = unidadDosis != null && !unidadDosis.isBlank();
             return hasDose == hasUnit;

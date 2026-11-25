@@ -1,0 +1,110 @@
+IF OBJECT_ID(N'[geo].[PA_Departamento_Sel_Listado]') IS NOT NULL
+    DROP PROCEDURE [geo].[PA_Departamento_Sel_Listado];
+GO
+
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+/******************************************************************************************************
+' Nombre del PA            : geo.PA_Departamento_Sel_Listado
+' Descripción            : Lista departamento.
+' Aplicativo / Módulo    : DESCO / Geografía
+*******************************************************************************************************/
+CREATE PROCEDURE [geo].[PA_Departamento_Sel_Listado]
+    @bResultado BIT=NULL OUTPUT,
+    @cMensaje NVARCHAR(300)=NULL OUTPUT,
+    @cCodigoRespuesta VARCHAR(60)=NULL OUTPUT,
+    @nHttpRespuesta SMALLINT=NULL OUTPUT
+AS
+BEGIN
+    SET @cMensaje=NULL; SET @cCodigoRespuesta=NULL; SET @nHttpRespuesta=NULL;
+
+    /* Respuesta explícita; mensajes públicos aprobados. */
+    SET NOCOUNT ON;
+    DECLARE @__DbTranEntrada INT = @@TRANCOUNT,
+            @__DbTranAbierta BIT = 0,
+            @__DbSavepoint VARCHAR(32) = REPLACE(CONVERT(VARCHAR(36),NEWID()),'-',''),
+            @__DbMensaje NVARCHAR(300),
+            @__DbError BIT = 0;
+
+    SET @bResultado=0;
+BEGIN TRY
+
+    SET NOCOUNT ON;
+
+    SELECT
+        D.departamento_codigo AS departamentoCodigo,
+        D.nombre AS departamentoNombre
+    FROM [geo].[Departamento] D
+    WHERE D.estado = 1
+    ORDER BY
+        D.nombre;
+
+    END TRY
+    BEGIN CATCH
+
+        SET @__DbError = 1;
+BEGIN
+    IF @__DbTranAbierta = 1
+    BEGIN
+        IF @__DbTranEntrada = 0 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        ELSE IF @__DbTranEntrada > 0 AND XACT_STATE() = 1
+            ROLLBACK TRANSACTION @__DbSavepoint;
+        SET @__DbTranAbierta = 0;
+    END;
+END;
+EXEC [config].[PA_Respuesta_ResolverError]
+    @cProcedimiento = N'geo.PA_Departamento_Sel_Listado',
+    @cMensaje = @__DbMensaje OUTPUT,
+    @cJson = NULL,
+    @bMensajePublicoGenerico = 0;
+SET @bResultado=0; SET @cMensaje=@__DbMensaje;
+    END CATCH;
+
+__DESCO_Salida:
+BEGIN TRY
+
+IF @__DbTranAbierta = 1
+BEGIN
+BEGIN
+    IF @__DbTranAbierta = 1
+    BEGIN
+        IF @__DbTranEntrada = 0 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        ELSE IF @__DbTranEntrada > 0 AND XACT_STATE() = 1
+            ROLLBACK TRANSACTION @__DbSavepoint;
+        SET @__DbTranAbierta = 0;
+    END;
+END;
+END;
+
+END TRY
+BEGIN CATCH
+
+        SET @__DbError = 1;
+BEGIN
+    IF @__DbTranAbierta = 1
+    BEGIN
+        IF @__DbTranEntrada = 0 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        ELSE IF @__DbTranEntrada > 0 AND XACT_STATE() = 1
+            ROLLBACK TRANSACTION @__DbSavepoint;
+        SET @__DbTranAbierta = 0;
+    END;
+END;
+EXEC [config].[PA_Respuesta_ResolverError]
+    @cProcedimiento = N'geo.PA_Departamento_Sel_Listado',
+    @cMensaje = @__DbMensaje OUTPUT,
+    @cJson = NULL,
+    @bMensajePublicoGenerico = 0;
+SET @bResultado=0; SET @cMensaje=@__DbMensaje;
+END CATCH;
+SET @bResultado=CASE WHEN @__DbError=0 THEN 1 ELSE 0 END;
+SET @bResultado=ISNULL(@bResultado,0);
+SELECT @cMensaje=R.mensaje,@cCodigoRespuesta=R.codigo,@nHttpRespuesta=R.http_sugerido
+FROM config.FN_RespuestaUsuario(N'geo.PA_Departamento_Sel_Listado',@bResultado,@cMensaje) R;
+IF @bResultado=0 AND @@NESTLEVEL>1 THROW 51000,@cMensaje,1;
+IF @bResultado=1 RETURN 0;
+RETURN 1;
+END;
+GO

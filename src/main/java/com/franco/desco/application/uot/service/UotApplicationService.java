@@ -63,4 +63,9 @@ public class UotApplicationService implements UotUseCase {
     public AppResult<Void> assignRole(UotCommands.AssignRole command, SessionIdentity identity) {
         return ApplicationResults.ok(persistence.assignRole(command, identity), "UOT_ROL_ASIGNADO", "UOT_ROL_NO_ASIGNADO", AppStatus.BAD_REQUEST);
     }
+
+    @Override
+    public AppResult<Void> assignAccess(UotCommands.AssignAccess command, SessionIdentity identity) {
+        return ApplicationResults.ok(persistence.assignAccess(command, identity), "UOT_ACCESO_ASIGNADO", "UOT_ACCESO_NO_ASIGNADO", AppStatus.BAD_REQUEST);
+    }
 }

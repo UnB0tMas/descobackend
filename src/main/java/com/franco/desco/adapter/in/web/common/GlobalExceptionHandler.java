@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.time.Instant;
 import java.util.Locale;
@@ -239,6 +240,13 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void disconnectedClient(AsyncRequestNotUsableException exception, HttpServletRequest request) {
+        // El cliente cerró el canal: la respuesta no admite JSON ni otro estado HTTP.
+        log.debug("Conexión cerrada por el cliente. correlationId={} endpoint={}",
+                CorrelationIdFilter.correlationId(request), request.getRequestURI());
+    }
+
     @ExceptionHandler(HttpMessageNotWritableException.class)
     public ResponseEntity<ApiResponse<Void>> responseNotWritable(
             HttpMessageNotWritableException exception,
@@ -290,6 +298,14 @@ public class GlobalExceptionHandler {
     ) {
         UUID correlationId =
                 CorrelationIdFilter.correlationId(request);
+
+        if (status.is5xxServerError()) {
+            log.error(">> [HTTP ERROR] status={} codigo={} mensaje={} metodo={} endpoint={} correlacionId={}",
+                    status.value(), code, message, request.getMethod(), request.getRequestURI(), correlationId);
+        } else {
+            log.warn(">> [HTTP ERROR] status={} codigo={} mensaje={} metodo={} endpoint={} correlacionId={}",
+                    status.value(), code, message, request.getMethod(), request.getRequestURI(), correlationId);
+        }
 
         return ResponseEntity
                 .status(status)

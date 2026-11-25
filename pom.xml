@@ -52,6 +52,9 @@
         <!-- Argon2 / Bouncy Castle -->
         <bouncycastle.version>1.85.2</bouncycastle.version>
 
+        <!-- Versión de ZXing utilizada por la generación del QR en PDF. -->
+        <zxing.version>3.5.3</zxing.version>
+
     </properties>
 
     <!-- ========================================================= -->
@@ -392,6 +395,21 @@
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>5.4.1</version>
+        </dependency>
+
+        <!-- QR del comprobante: requerida durante la compilación de FiscalPdfService. -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>${zxing.version}</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- Informes sanitarios PDF. -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.8</version>
         </dependency>
 
     </dependencies>

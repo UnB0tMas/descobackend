@@ -8,6 +8,7 @@ import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @EnableScheduling
@@ -17,9 +18,61 @@ public class DescoApplication {
 
     public static void main(String[] args) {
         SpringApplication application = new SpringApplication(DescoApplication.class);
-        application.addInitializers(context ->
-                prepararEntornoLocal(context.getEnvironment()));
+        application.addInitializers(context -> {
+            prepararConexionBaseDatos(context.getEnvironment());
+            prepararEntornoLocal(context.getEnvironment());
+        });
         application.run(args);
+    }
+
+    public static void prepararConexionBaseDatos(ConfigurableEnvironment environment) {
+        String ambiente = environment.getProperty("app.database.environment", "dev").trim();
+        if ("dev".equalsIgnoreCase(ambiente)) {
+            return;
+        }
+        if (!"prod".equalsIgnoreCase(ambiente)) {
+            throw new IllegalStateException("app.database.environment debe ser dev o prod.");
+        }
+
+        String url = propiedadConexionRequerida(environment, "app.database.prod.url");
+        String username = propiedadConexionRequerida(environment, "app.database.prod.username");
+        String password = propiedadConexionRequerida(environment, "app.database.prod.password");
+
+        Map<String, Object> conexion = new HashMap<>();
+        conexion.put("spring.datasource.url", url);
+        conexion.put("spring.datasource.username", username);
+        conexion.put("spring.datasource.password", password);
+
+        // Evita que propiedades JDBC especificas de Hikari conserven la conexion DEV.
+        if (environment.containsProperty("spring.datasource.hikari.jdbc-url")) {
+            conexion.put("spring.datasource.hikari.jdbc-url", url);
+        }
+        if (environment.containsProperty("spring.datasource.hikari.username")) {
+            conexion.put("spring.datasource.hikari.username", username);
+        }
+        if (environment.containsProperty("spring.datasource.hikari.password")) {
+            conexion.put("spring.datasource.hikari.password", password);
+        }
+
+        // Si Flyway tiene una conexion propia, debe apuntar al mismo ambiente.
+        if (environment.containsProperty("spring.flyway.url")
+                || environment.containsProperty("spring.flyway.user")
+                || environment.containsProperty("spring.flyway.password")) {
+            conexion.put("spring.flyway.url", url);
+            conexion.put("spring.flyway.user", username);
+            conexion.put("spring.flyway.password", password);
+        }
+
+        environment.getPropertySources().addFirst(
+                new MapPropertySource("desco-database-prod", conexion));
+    }
+
+    private static String propiedadConexionRequerida(ConfigurableEnvironment environment, String key) {
+        String value = environment.getProperty(key);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Falta configurar " + key + " para PROD.");
+        }
+        return value;
     }
 
     /**

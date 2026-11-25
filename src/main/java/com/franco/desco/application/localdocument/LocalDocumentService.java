@@ -1,3 +1,4 @@
+
 package com.franco.desco.application.localdocument;
 
 import com.franco.desco.adapter.out.sql.common.SqlIdempotencyCoordinator;
@@ -10,6 +11,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.*;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,6 +23,7 @@ import java.util.*;
 
 @Service
 public class LocalDocumentService {
+    private static final Logger LOG = LoggerFactory.getLogger(LocalDocumentService.class);
     private static final int UPLOAD_LOCK_STRIPES = 64;
     private static final Object[] UPLOAD_LOCKS = createUploadLocks();
     private final JdbcTemplate jdbc;
@@ -64,9 +68,23 @@ public class LocalDocumentService {
         boolean comprobantePago = "NINGUNO".equalsIgnoreCase(targetType)
                 && "COMPROBANTE".equalsIgnoreCase(category)
                 && uot.hasPermission(identity, uotId, "APAPPSS_PAGOS_PAGAR");
-        if (!expedientePlanta && !comprobantePago
+        boolean cajaEvidence = "OTRO".equalsIgnoreCase(category)
+                && "NINGUNO".equalsIgnoreCase(targetType)
+                && evidence!=null && "CAJA".equalsIgnoreCase(evidence.tipo())
+                && (uot.hasPermission(identity,uotId,"CAJAS_ABRIR")
+                    || uot.hasPermission(identity,uotId,"CAJAS_CERRAR"))
+                && file.getContentType()!=null
+                && java.util.Set.of("image/jpeg","image/png","image/webp").contains(file.getContentType().toLowerCase(java.util.Locale.ROOT))
+                && file.getSize()<=8388608;
+        boolean correspondencia = "CORRESPONDENCIA".equalsIgnoreCase(category);
+        if (correspondencia && (!"NINGUNO".equalsIgnoreCase(targetType)
+                || !belongsToPrincipalUot(identity, uotId)))
+            return forbidden("Solo puede adjuntar archivos desde su unidad principal.");
+        if (!correspondencia && !expedientePlanta && !comprobantePago && !cajaEvidence
                 && !uot.hasPermission(identity, uotId, salida ? "SALIDAS_EDITAR" : "ARCHIVOS_CREAR"))
             return forbidden("No tiene permiso para registrar este documento.");
+        if("CAJA".equalsIgnoreCase(evidence==null?null:evidence.tipo())&&!cajaEvidence)
+            return bad("Selecciona imágenes JPG, PNG o WebP de hasta 8 MB.");
         String normalizedCategory;
         try {
             normalizedCategory = normalizeCategory(category);
@@ -74,8 +92,18 @@ public class LocalDocumentService {
             return AppResult.error(AppStatus.BAD_REQUEST, "ARCHIVO_INVALIDO", exception.getMessage());
         }
         String normalizedTarget = targetType == null || targetType.isBlank() ? "NINGUNO" : targetType.trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("NINGUNO", "BIEN", "PRODUCTO", "SALIDA", "PREDIO", "PARCELA", "CULTIVO", "CENSO", "VISITA", "EVALUACION", "CASO_SANIDAD", "TRATAMIENTO", "SEGUIMIENTO", "PRODUCCION").contains(normalizedTarget)) return bad("El tipo de vínculo del archivo no es válido.");
-        if (!"NINGUNO".equals(normalizedTarget) && targetId == null) return bad("Seleccione el registro al que pertenece el archivo.");
+        if (!Set.of("NINGUNO", "BIEN", "PRODUCTO", "MOVIMIENTO", "SALIDA", "PREDIO", "PARCELA", "CULTIVO", "CENSO", "VISITA", "EVALUACION", "CASO_SANIDAD", "TRATAMIENTO", "SEGUIMIENTO", "PRODUCCION", "GASTO").contains(normalizedTarget)) return bad("El tipo de vínculo del archivo no es válido.");
+        if (!"NINGUNO".equals(normalizedTarget) && (targetId == null || targetId <= 0)) return bad("Seleccione el registro al que pertenece el archivo.");
+        if ("GASTO".equals(normalizedTarget)) {
+            if (!uot.hasPermission(identity, uotId, "GASTOS_EDITAR"))
+                return forbidden("No tiene permiso para adjuntar comprobantes al gasto.");
+            if (!"COMPROBANTE".equals(normalizedCategory))
+                return bad("Seleccione la categoría Comprobante para el gasto.");
+            String mime = file.getContentType();
+            if (mime == null || !Set.of("application/pdf", "image/jpeg", "image/png", "image/webp")
+                    .contains(mime.split(";", 2)[0].trim().toLowerCase(Locale.ROOT)))
+                return bad("Seleccione una imagen JPG, PNG, WebP o un PDF.");
+        }
 
         if(evidence!=null) {
             if(evidence.tipo()==null || (evidence.tipo().isBlank() || evidence.tipo().length()>40) || !Set.of("CARGA","CAMARA").contains(evidence.origen())) return bad("Tipo de evidencia inválido.");
@@ -144,10 +172,11 @@ public class LocalDocumentService {
         } catch (StorageFailure exception) {
             return AppResult.error(AppStatus.BAD_REQUEST, "ARCHIVO_LOCAL_NO_REGISTRADO", exception.getMessage());
         } catch (DataAccessException exception) {
-            // También cubre un eventual fallo al confirmar la transacción, que
-            // sucede fuera del cuerpo de transaction.execute(...).
+            // Registra el diagnóstico técnico real, sin exponer SQL ni datos personales al cliente.
+            LOG.error("Fallo SQL al registrar archivo local: accion=SUBIR categoria={} uotId={} usuarioId={}",
+                    normalizedCategory, uotId, identity.usuarioId(), exception);
             deleteQueue.enqueue(key);
-            return AppResult.error(AppStatus.SERVICE_UNAVAILABLE, "ARCHIVO_LOCAL_NO_REGISTRADO", "No se pudo registrar el archivo en este momento.");
+            return AppResult.error(AppStatus.SERVICE_UNAVAILABLE, "ARCHIVO_LOCAL_NO_REGISTRADO", "No se pudo adjuntar el archivo. Intenta nuevamente.");
         }
     }
 
@@ -173,12 +202,18 @@ public class LocalDocumentService {
                     WHERE A.estado=1 AND A.proveedor_almacenamiento='LOCAL'
                       AND EXISTS(SELECT 1 FROM seg.UsuarioUOT UU WHERE UU.usuario_id=? AND UU.uot_id=A.uot_id AND UU.estado=1 AND UU.fecha_hasta IS NULL)
                       AND seg.FN_Usuario_TienePermisoUOT(?,A.uot_id,'ARCHIVOS_LISTAR')=1
+                      AND ISNULL(A.categoria,'')<>'CORRESPONDENCIA'
+                      AND (NOT EXISTS(SELECT 1 FROM archivo.ArchivoVinculo AV
+                           WHERE AV.archivo_id=A.archivo_id AND AV.estado=1 AND AV.gasto_campania_id IS NOT NULL)
+                           OR (seg.FN_Usuario_TienePermisoUOT(?,A.uot_id,'ARCHIVOS_VER')=1
+                           AND (seg.FN_Usuario_TienePermisoUOT(?,A.uot_id,'GASTOS_VER')=1
+                                OR seg.FN_Usuario_TienePermisoUOT(?,A.uot_id,'GASTOS_LISTAR')=1)))
                       AND (? IS NULL OR A.uot_id=?)
                       AND (A.usuario_id=? OR NOT EXISTS(
                         SELECT 1 FROM archivo.ArchivoVinculo AV
                         WHERE AV.archivo_id=A.archivo_id AND AV.salida_campo_id IS NOT NULL AND AV.estado=1))
                     ORDER BY A.fecha_carga DESC,A.archivo_id DESC
-                    """, (rs, rowNum) -> mapFile(rs), identity.usuarioId(), identity.usuarioId(), filterUot, filterUot, identity.usuarioId());
+                    """, (rs, rowNum) -> mapFile(rs), identity.usuarioId(), identity.usuarioId(), identity.usuarioId(), identity.usuarioId(), identity.usuarioId(), filterUot, filterUot, identity.usuarioId());
             return AppResult.ok("ARCHIVOS_LOCALES_LISTADOS", "Archivos consultados correctamente.", values);
         } catch (DataAccessException exception) {
             return AppResult.error(AppStatus.SERVICE_UNAVAILABLE, "ARCHIVOS_LOCALES_NO_LISTADOS", "No se pudieron consultar los archivos.");
@@ -198,7 +233,41 @@ public class LocalDocumentService {
         }
     }
 
+    private boolean belongsToPrincipalUot(SessionIdentity identity, Long uotId) {
+        if(identity==null || identity.usuarioId()==null || uotId==null) return false;
+        Integer exists=jdbc.queryForObject("""
+            SELECT COUNT(1) FROM seg.Usuario U
+            JOIN org.Empleado E ON E.empleado_id=U.persona_id AND E.estado=1
+            JOIN org.EmpleadoUOT EU ON EU.empleado_id=E.empleado_id AND EU.es_principal=1
+                AND EU.estado=1 AND EU.uot_id=?
+                AND EU.fecha_desde<=CONVERT(DATE,SYSUTCDATETIME())
+                AND (EU.fecha_hasta IS NULL OR EU.fecha_hasta>=CONVERT(DATE,SYSUTCDATETIME()))
+                AND (EU.fecha_cese IS NULL OR EU.fecha_cese>=CONVERT(DATE,SYSUTCDATETIME()))
+            WHERE U.usuario_id=? AND U.estado=1 AND U.estado_cuenta='ACTIVA'
+                AND (E.fecha_cese IS NULL OR E.fecha_cese>=CONVERT(DATE,SYSUTCDATETIME()))
+            """,Integer.class,uotId,identity.usuarioId());
+        return exists!=null && exists>0;
+    }
+
     private boolean canViewContent(SessionIdentity identity, LocalDocumentModels.FileInfo info) {
+        if ("CORRESPONDENCIA".equals(info.category())) {
+            // La correspondencia NUNCA hereda ARCHIVOS_VER ni permisos de APAPPSS.
+            // Un adjunto aún no enviado solo puede verlo quien lo cargó.
+            Integer allowed = jdbc.queryForObject("""
+                SELECT CONVERT(INT,CASE WHEN EXISTS(
+                    SELECT 1 FROM doc.DocumentoArchivo DA
+                    JOIN doc.Documento D ON D.documento_id=DA.documento_id
+                    WHERE DA.archivo_id=? AND (D.emisor_usuario_id=? OR EXISTS(
+                        SELECT 1 FROM doc.Destinatario R
+                        WHERE R.documento_id=D.documento_id AND R.usuario_id=?))
+                )
+                THEN 1 WHEN NOT EXISTS(SELECT 1 FROM doc.DocumentoArchivo WHERE archivo_id=?)
+                    AND EXISTS(SELECT 1 FROM archivo.Archivo WHERE archivo_id=? AND usuario_id=? AND estado=1)
+                THEN 1 ELSE 0 END)
+                """, Integer.class, info.fileId(),identity.usuarioId(),identity.usuarioId(),
+                info.fileId(),info.fileId(),identity.usuarioId());
+            return allowed != null && allowed == 1;
+        }
         Integer salida = jdbc.queryForObject("""
             SELECT COUNT(*) FROM archivo.ArchivoVinculo
             WHERE archivo_id=? AND salida_campo_id IS NOT NULL AND estado=1
@@ -226,6 +295,22 @@ public class LocalDocumentService {
                 WHERE B.comprobante_archivo_id=? AND C.uot_id=? AND C.estado=1
                 """, Integer.class, info.fileId(), info.uotId());
             if (comprobante!=null && comprobante>0) return true;
+        }
+        Integer expense = jdbc.queryForObject("""
+                SELECT COUNT(1) FROM archivo.ArchivoVinculo
+                WHERE archivo_id=? AND gasto_campania_id IS NOT NULL AND estado=1
+                """, Integer.class, info.fileId());
+        if (expense != null && expense > 0) {
+            if (!uot.hasPermission(identity, info.uotId(), "ARCHIVOS_VER")
+                    || (!uot.hasPermission(identity, info.uotId(), "GASTOS_VER")
+                    && !uot.hasPermission(identity, info.uotId(), "GASTOS_LISTAR"))) return false;
+            Integer allowed = jdbc.queryForObject("""
+                    SELECT COUNT(1) FROM archivo.ArchivoVinculo AV
+                    JOIN finanzas.GastoCampania G ON G.gasto_campania_id=AV.gasto_campania_id
+                    JOIN comercial.CampaniaVenta C ON C.campania_venta_id=G.campania_venta_id
+                    WHERE AV.archivo_id=? AND AV.estado=1 AND C.uot_id=?
+                    """, Integer.class, info.fileId(), info.uotId());
+            return allowed != null && allowed > 0;
         }
         if (uot.hasPermission(identity, info.uotId(), "ARCHIVOS_VER")) return true;
         // Lectura puntual del documento vinculado a este expediente; no habilita
@@ -278,6 +363,8 @@ public class LocalDocumentService {
         if (reason == null || reason.isBlank()) return badVoid("Indique el motivo de retiro.");
         try {
             LocalDocumentModels.FileInfo info = getAnyInternal(fileId);
+            if (info != null && "CORRESPONDENCIA".equals(info.category()))
+                return badVoid("Los adjuntos administrativos se conservan en la trazabilidad; no se retiran desde Archivos.");
             if (info == null || !uot.hasPermission(identity, info.uotId(), "ARCHIVOS_RETIRAR")) return AppResult.error(AppStatus.NOT_FOUND, "ARCHIVO_NO_DISPONIBLE", "El archivo no está disponible.");
             Integer usado = jdbc.queryForObject("SELECT COUNT(*) FROM finanzas.PagoBeneficiarioE5 WHERE comprobante_archivo_id=?", Integer.class, fileId);
             if (usado!=null && usado>0) return badVoid("El comprobante pertenece a un pago confirmado.");
@@ -300,6 +387,27 @@ public class LocalDocumentService {
 
     private void link(SessionIdentity identity, Long uotId, Long fileId, String mime, String type, Long targetId, boolean principal) {
         if ("NINGUNO".equals(type)) return;
+        if ("GASTO".equals(type)) {
+            linkExpense(identity, uotId, fileId, targetId);
+            return;
+        }
+        if ("MOVIMIENTO".equals(type)) {
+            if (!uot.hasPermission(identity, uotId, "ALMACENES_MOVIMIENTO")) {
+                throw new StorageFailure("No tiene permiso para adjuntar documentos al movimiento.");
+            }
+            Integer owned = jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM logistica.MovimientoInventario M WITH (NOLOCK)
+                    WHERE M.movimiento_inventario_id=? AND M.uot_id=? AND M.estado=1
+                    """, Integer.class, targetId, uotId);
+            if (owned == null || owned != 1) {
+                throw new StorageFailure("El movimiento no pertenece a la UOT seleccionada.");
+            }
+            jdbc.update("""
+                    INSERT INTO archivo.ArchivoVinculo (archivo_id,movimiento_inventario_id,estado)
+                    VALUES (?,?,1)
+                    """, fileId, targetId);
+            return;
+        }
         if ("SALIDA".equals(type)) {
             Integer owner = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM campo.SalidaE2 E
@@ -329,6 +437,66 @@ public class LocalDocumentService {
         if (exists == null || exists == 0) throw new StorageFailure("El producto no está disponible.");
         if (principal) jdbc.update("UPDATE logistica.ProductoImagen SET es_principal=0 WHERE producto_id=? AND estado=1", targetId);
         jdbc.update("INSERT logistica.ProductoImagen(producto_id,archivo_id,es_principal,orden,estado) VALUES(?,?,?,COALESCE((SELECT MAX(orden)+1 FROM logistica.ProductoImagen WHERE producto_id=?),1),1)", targetId, fileId, principal, targetId);
+    }
+
+    private void linkExpense(SessionIdentity identity, Long uotId, Long fileId, Long expenseId) {
+        // Se ejecuta dentro de la misma transacción que registra archivo.Archivo.
+        // No se permite vincular un comprobante a un gasto de otra UOT.
+        List<Long> campaigns = jdbc.queryForList("""
+                SELECT G.campania_venta_id
+                FROM finanzas.GastoCampania G
+                JOIN comercial.CampaniaVenta C ON C.campania_venta_id=G.campania_venta_id
+                WHERE G.gasto_campania_id=? AND G.estado=1 AND C.uot_id=? AND C.estado=1
+                """, Long.class, expenseId, uotId);
+        if (campaigns.size() != 1)
+            throw new StorageFailure("El gasto no está disponible en la UOT seleccionada.");
+        Long campaignId = campaigns.getFirst();
+        // Mismo bloqueo de campaña que los gastos, repartos y pagos de E5.
+        Integer lock = jdbc.queryForObject("""
+                DECLARE @resultado INT;
+                EXEC @resultado = sys.sp_getapplock
+                    @Resource=?, @LockMode='Exclusive', @LockOwner='Transaction',
+                    @LockTimeout=10000, @DbPrincipal='public';
+                SELECT @resultado;
+                """, Integer.class, "APAPPSS_E5_CAMP_" + campaignId);
+        if (lock == null || lock < 0)
+            throw new StorageFailure("La campaña está siendo procesada. Intente nuevamente.");
+        if (!uot.hasPermission(identity, uotId, "GASTOS_EDITAR"))
+            throw new StorageFailure("No tiene permiso para adjuntar comprobantes al gasto.");
+        Integer allowed = jdbc.queryForObject("""
+                SELECT COUNT(1)
+                FROM finanzas.GastoCampania G WITH (UPDLOCK,HOLDLOCK)
+                JOIN comercial.CampaniaVenta C WITH (UPDLOCK,HOLDLOCK)
+                    ON C.campania_venta_id=G.campania_venta_id
+                WHERE G.gasto_campania_id=? AND G.estado=1
+                  AND G.estado_proceso IN ('REGISTRADO','APROBADO')
+                  AND C.campania_venta_id=? AND C.uot_id=? AND C.estado=1
+                  AND C.estado_proceso IN ('ACTIVA','VENCIDA')
+                  AND NOT EXISTS (SELECT 1 FROM comercial.CierreCampaniaE5 X
+                                  WHERE X.campania_venta_id=C.campania_venta_id)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM finanzas.PagoSocio PG
+                      JOIN finanzas.LiquidacionSocio L ON L.liquidacion_socio_id=PG.liquidacion_socio_id
+                      JOIN comercial.ParticipacionCampaniaSocio P
+                          ON P.participacion_campania_socio_id=L.participacion_campania_socio_id
+                      WHERE P.campania_venta_id=C.campania_venta_id AND PG.estado=1
+                        AND PG.estado_proceso IN ('CONFIRMADO','ANULADO'))
+                  AND EXISTS (
+                      SELECT 1 FROM org.ConvenioUOTOrganizacion CU
+                      JOIN org.ConvenioModuloEspecial CM
+                          ON CM.convenio_uot_organizacion_id=CU.convenio_uot_organizacion_id AND CM.estado=1
+                      JOIN seg.ModuloEspecial M ON M.modulo_especial_id=CM.modulo_especial_id
+                          AND M.codigo='COMERCIALIZACION_ASOCIATIVA' AND M.estado=1
+                      WHERE CU.uot_id=C.uot_id AND CU.empresa_id=C.asociacion_id AND CU.estado=1
+                        AND (CU.fecha_inicio IS NULL OR CU.fecha_inicio<=CONVERT(DATE,DATEADD(HOUR,-5,SYSUTCDATETIME())))
+                        AND (CU.fecha_fin IS NULL OR CU.fecha_fin>=CONVERT(DATE,DATEADD(HOUR,-5,SYSUTCDATETIME()))))
+                """, Integer.class, expenseId, campaignId, uotId);
+        if (allowed == null || allowed != 1)
+            throw new StorageFailure("El gasto o la campaña no admite nuevos comprobantes.");
+        jdbc.update("""
+                INSERT archivo.ArchivoVinculo(archivo_id,gasto_campania_id,estado)
+                VALUES(?,?,1)
+                """, fileId, expenseId);
     }
 
     private record TechnicalTarget(String column, String permission, String predioQuery) {}
@@ -437,6 +605,7 @@ public class LocalDocumentService {
                 "DOCUMENTO",
                 "TICKET",
                 "COMPROBANTE",
+                "CORRESPONDENCIA",
                 "OTRO"
         ).contains(category)) {
             throw new StorageFailure(

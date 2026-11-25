@@ -10,7 +10,7 @@ public final class E1Models {
     public record Convenio(Long id, String nombre) {}
     public record Convenios(List<Convenio> items) {}
     public record Persona(Long personaId, String tipoDocumento, String numeroDocumento, String nombreCompleto) {}
-    public record Personas(List<Persona> items) {}
+    public record Personas(List<Persona> items) { public Personas { items=emptyIfNull(items); } }
     public record PredioResumen(Long predioId, String codigo, String nombre, String distritoCodigo, String referencia,
                                 BigDecimal latitud, BigDecimal longitud, String titular) {}
     public record Predios(List<PredioResumen> items) {}

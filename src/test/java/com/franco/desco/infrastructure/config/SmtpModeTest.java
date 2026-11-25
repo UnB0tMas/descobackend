@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SmtpModeTest {
     private static final String LOCAL_DB =
-            "jdbc:sqlserver://localhost:1433;databaseName=DESCO_DB_dev;encrypt=true";
+            "jdbc:sqlserver://localhost:1433;databaseName=DESCO_DB_dev2;encrypt=true";
 
     private MockEnvironment local(String smtp) {
         MockEnvironment env = new MockEnvironment()
@@ -34,6 +34,20 @@ class SmtpModeTest {
         DescoApplication.prepararEntornoLocal(env);
         assertThat(env.getProperty("server.address")).isEqualTo("127.0.0.1");
         assertThat(SmtpMode.from(env).devAutoVerifyOtp()).isTrue();
+    }
+
+    @Test void nuevaBaseLocalConservaPoliticaDeOtp() {
+        MockEnvironment env = new MockEnvironment()
+                .withProperty("app.smtp.enabled", "false")
+                .withProperty("spring.datasource.url", "jdbc:sqlserver://localhost:1433;databaseName=DESCO_DB;encrypt=true");
+        DescoApplication.prepararEntornoLocal(env);
+        assertThat(env.getProperty("server.address")).isEqualTo("127.0.0.1");
+        assertThat(SmtpMode.from(env).devAutoVerifyOtp()).isTrue();
+        env.setProperty("server.address", "0.0.0.0");
+        assertThat(SmtpMode.from(env).devAutoVerifyOtp()).isFalse();
+        env.setProperty("server.address", "127.0.0.1");
+        env.setActiveProfiles("prod");
+        assertThat(SmtpMode.from(env).devAutoVerifyOtp()).isFalse();
     }
 
     @Test void smtpActivadoMantieneDobleFactor() {

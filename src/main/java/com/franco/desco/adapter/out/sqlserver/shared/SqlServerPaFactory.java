@@ -19,7 +19,7 @@ public class SqlServerPaFactory {
             String schema,
             String procedure
     ) {
-        return new SimpleJdbcCall(dataSource)
+        return new LoggedSimpleJdbcCall(dataSource, schema + "." + procedure)
                 .withSchemaName(schema)
                 .withProcedureName(procedure);
     }

@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.persistence.planta;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.shared.PersistenceResult;
 import com.franco.desco.application.shared.RequestMetadata;
 import com.franco.desco.application.shared.SessionIdentity;
@@ -50,7 +51,7 @@ public class FundoAccionesSqlServerAdapter {
             case RETIRAR -> "{call prod.PA_Fundo_Upd_RetirarEnBloque(?,?,?,?,?,?)}";
         };
         try {
-            return jdbc.execute(connection -> {
+            return PaTrace.call(procedure, accion.name(), () -> jdbc.execute(connection -> {
                 CallableStatement statement = connection.prepareCall(procedure);
                 statement.setNString(1, payload);
                 statement.registerOutParameter(2, Types.LONGNVARCHAR);
@@ -70,7 +71,7 @@ public class FundoAccionesSqlServerAdapter {
                 String raw = statement.getNString(2);
                 T value = raw == null || raw.isBlank() ? null : mapper.readValue(raw, type);
                 return PersistenceResult.ok(codigo, mensaje, http == 0 ? 200 : http, value);
-            });
+            }));
         } catch (DataAccessException exception) {
             return PersistenceResult.error("FUNDO_BD_NO_DISPONIBLE",
                     "No fue posible completar la operación.", 503);

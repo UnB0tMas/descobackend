@@ -42,11 +42,12 @@ public final class ResourceRequests {
             @Positive Long proveedorPersonaId,
             @Positive Long proveedorEmpresaId,
             @Size(max = 500) String observacion,
+            Boolean permiteSalidaTecnica,
             @Valid VehicleData vehiculo
     ) {
-        @AssertTrue(message = "Seleccione una empresa como proveedor.")
+        @AssertTrue(message = "Seleccione solo un proveedor.")
         public boolean isProveedorValido() {
-            return proveedorPersonaId == null;
+            return proveedorPersonaId == null || proveedorEmpresaId == null;
         }
     }
 
@@ -64,11 +65,12 @@ public final class ResourceRequests {
             @Positive Long proveedorPersonaId,
             @Positive Long proveedorEmpresaId,
             @Size(max = 500) String observacion,
+            Boolean permiteSalidaTecnica,
             @Valid VehicleData vehiculo
     ) {
-        @AssertTrue(message = "Seleccione una empresa como proveedor.")
+        @AssertTrue(message = "Seleccione solo un proveedor.")
         public boolean isProveedorValido() {
-            return proveedorPersonaId == null;
+            return proveedorPersonaId == null || proveedorEmpresaId == null;
         }
     }
 

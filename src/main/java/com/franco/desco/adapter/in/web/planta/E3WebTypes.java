@@ -54,7 +54,7 @@ public final class E3WebTypes {
    Integer anioResumen,List<ResumenParcela> resumenParcelas) {}
  @Schema(name="E3EventoResponse") public record Evento(Long eventoId,String tipo,String estadoAnterior,String estadoNuevo,String observacion,Long visitaId,Long usuarioId,String usuarioNombre,Instant fechaHora) {}
  @Schema(name="E3EpisodioResponse") public record Episodio(Long episodioId,String diagnostico,Long diagnosticoId,Instant inicio,Instant fin,String observacion,
-   Long usuarioAperturaId,String usuarioApertura,Long usuarioCierreId,String usuarioCierre) {}
+   Long usuarioAperturaId,String usuarioApertura,Long usuarioCierreId,String usuarioCierre,String estado) {}
  @Schema(name="E3TratamientoResponse") public record TratamientoItem(Long tratamientoId,Long episodioId,String descripcion,String resultado,Instant fechaHora,Long visitaId,
    Long catalogoTratamientoId,String catalogoTratamiento,Long usuarioId,String usuarioNombre) {}
  @Schema(name="E3ProduccionResponse") public record ProduccionItem(Long produccionId,Integer anio,String tipo,BigDecimal estimadoKg,

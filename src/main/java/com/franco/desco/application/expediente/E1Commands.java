@@ -23,6 +23,7 @@ public final class E1Commands {
     public record LinkConvenio(Long uotId, Long convenioId, Long predioId, Vinculo vinculo) {}
 
     public record Persona(
+            Long personaId,
             String tipoDocumento,
             String numeroDocumento,
             String nombres,

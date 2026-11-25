@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.persistence.planta;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.planta.E3Commands.Execute;
 import com.franco.desco.application.planta.port.out.E3PersistencePort;
 import com.franco.desco.application.shared.PersistenceResult;
@@ -59,7 +60,7 @@ public final class E3SqlServerAdapter implements E3PersistencePort {
                 "contexto", contexto, "filtros", filtros,
                 "datos", command.datos() == null ? Map.of() : command.datos()));
         try {
-            return jdbc.execute(connection -> {
+            return PaTrace.call(CALL, command.accion(), () -> jdbc.execute(connection -> {
                 CallableStatement statement = connection.prepareCall(CALL);
                 statement.setString(1, command.accion());
                 statement.setNString(2, payload);
@@ -79,7 +80,7 @@ public final class E3SqlServerAdapter implements E3PersistencePort {
                 String json = statement.getNString(3);
                 T data = json == null || json.isBlank() ? null : mapper.readValue(json, type);
                 return PersistenceResult.ok(code, message, status == 0 ? 200 : status, data);
-            });
+            }));
         } catch (DataAccessException exception) {
             return PersistenceResult.error("E3_BD_NO_DISPONIBLE",
                     "No se pudo completar la operación en este momento.", 503);

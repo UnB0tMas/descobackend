@@ -40,7 +40,8 @@ public class E3ClinicalController {
     public record EliminarRequest(@NotBlank @Size(min=5,max=1000) String motivo,@NotNull Long version) {}
     public record EnfermedadRequest(@NotNull @Positive Integer diagnosticoId,Instant inicio,@Size(max=1000) String observacion) {}
     public record EnfermedadEditarRequest(@Positive Integer diagnosticoId,@Size(max=1000) String observacion) {}
-    public record RecuperarRequest(Instant fechaCuracion,@Size(max=600) String comentario) {}
+    public record RecuperarRequest(Instant fechaCuracion,@Size(max=600) String comentario,
+        @Pattern(regexp="CONTROLADA|NO_CONTROLADA") String resultado) {}
     public record RetirarRequest(@NotBlank @Size(min=5,max=600) String motivo) {}
     public record TratamientoRequest(@NotNull @Positive Integer catalogoTratamientoId,Instant fechaAplicacion,
        @Size(max=600) String resultado,@Size(max=1000) String comentario) {}

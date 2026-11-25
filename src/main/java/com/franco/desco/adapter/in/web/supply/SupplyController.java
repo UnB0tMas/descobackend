@@ -16,6 +16,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -70,6 +71,7 @@ public class SupplyController {
     )
     public ResponseEntity<ApiResponse<PageResponse<SupplyResponses.Summary>>> list(
             @RequestParam(required = false) @Positive Long uotId,
+            @RequestParam(required = false) @Size(max = 120) String buscar,
             @RequestParam(defaultValue = "1") @Min(1) int pagina,
             @RequestParam(defaultValue = "20") @Min(1) @Max(500) int tamano,
             @Parameter(hidden = true) JwtAuthenticationToken authentication,
@@ -79,6 +81,7 @@ public class SupplyController {
                 service.list(
                         identities.resolve(authentication),
                         uotId,
+                        buscar,
                         pagina,
                         tamano
                 ),
@@ -105,6 +108,7 @@ public class SupplyController {
                         identities.resolve(authentication),
                         body.uotId(),
                         body.codigo(),
+                        body.productoId(),
                         body.nombre(),
                         body.unidadMedida(),
                         body.stockInicial(),
@@ -134,6 +138,7 @@ public class SupplyController {
                         identities.resolve(authentication),
                         body.uotId(),
                         id,
+                        body.productoId(),
                         body.nombre(),
                         body.unidadMedida(),
                         body.stockMinimo(),

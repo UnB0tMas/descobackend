@@ -15,6 +15,7 @@ public interface UotPersistencePort {
     PersistenceResult<Void> update(UotCommands.UpdateUnit command, SessionIdentity identity);
     PersistenceResult<Void> assignUser(UotCommands.AssignUser command, SessionIdentity identity);
     PersistenceResult<Void> assignRole(UotCommands.AssignRole command, SessionIdentity identity);
+    PersistenceResult<Void> assignAccess(UotCommands.AssignAccess command, SessionIdentity identity);
     boolean hasPermission(SessionIdentity identity, String permissionCode);
     boolean hasPermission(SessionIdentity identity, Long uotId, String permissionCode);
     boolean hasAccess(SessionIdentity identity, Long uotId);

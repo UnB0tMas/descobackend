@@ -21,7 +21,11 @@ public final class UotRequests {
     @Schema(name="UotUpdateRequest")
     public record Update(@Positive Long uotPadreId,@Positive Long ubicacionId,@NotBlank @Size(max=160) String nombre,@Size(max=400) String descripcion){}
     @Schema(name="UotAssignUserRequest")
-    public record AssignUser(@NotNull @Positive Long usuarioId,boolean predeterminada){}
+    public record AssignUser(@NotNull @Positive Long usuarioId, boolean predeterminada, @Positive Long rolId) {
+        public AssignUser(Long usuarioId, boolean predeterminada) {
+            this(usuarioId, predeterminada, null);
+        }
+    }
     @Schema(name="UotAssignRoleRequest",description="El rol se aplica únicamente dentro de la UOT indicada.")
     public record AssignRole(@NotNull @Positive Long usuarioId,@NotNull @Positive Long rolId){}
     @Schema(name="UotDeactivateRequest")

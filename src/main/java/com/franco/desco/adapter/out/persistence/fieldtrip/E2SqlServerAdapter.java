@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.persistence.fieldtrip;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.fieldtrip.E2Commands;
 import com.franco.desco.application.fieldtrip.port.out.E2PersistencePort;
 import com.franco.desco.application.shared.PersistenceResult;
@@ -59,7 +60,7 @@ public final class E2SqlServerAdapter implements E2PersistencePort {
         peticion.put("datos", datos == null ? Map.of() : datos);
         try {
             String payload = json.writeValueAsString(peticion);
-            return jdbc.execute(connection -> {
+            return PaTrace.call(PROCEDURE, accion, () -> jdbc.execute(connection -> {
                 CallableStatement statement = connection.prepareCall(PROCEDURE);
                 statement.setString(1, accion);
                 statement.setNString(2, payload);
@@ -85,7 +86,7 @@ public final class E2SqlServerAdapter implements E2PersistencePort {
                 }
                 T value = json.readValue(raw, responseClass);
                 return PersistenceResult.ok(code, message, http == 0 ? 200 : http, value);
-            });
+            }));
         } catch (DataAccessException ex) {
             LOG.error("Fallo SQL E2: acción={}, correlación={}", accion, metadata.correlacionId(), ex);
             return PersistenceResult.error("E2_BD_NO_DISPONIBLE", "No se pudo completar la operación en la base de datos.", 503);

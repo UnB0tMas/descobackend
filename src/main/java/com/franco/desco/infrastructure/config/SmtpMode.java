@@ -49,7 +49,7 @@ public record SmtpMode(boolean enabled, boolean devAutoVerifyOtp) {
                 internal ? "OTP_INTERNO_SOLO_DEV" : "MFA_SIN_CANAL");
         if (!internal) {
             LOG.warn("[AUTH CONFIG] SMTP deshabilitado sin MFA disponible. "
-                    + "La verificacion interna solo funciona con DESCO_DB_dev en SQL Server local "
+                    + "La verificacion interna solo funciona con DESCO_DB, DESCO_DB_dev o DESCO_DB_dev2 en SQL Server local "
                     + "y server.address=127.0.0.1; no se omitira MFA en servidores publicos.");
         }
         return new SmtpMode(enabled, internal);
@@ -67,7 +67,8 @@ public record SmtpMode(boolean enabled, boolean devAutoVerifyOtp) {
         return Arrays.stream(jdbc.split(";"))
                 .map(String::trim)
                 .map(value -> value.toLowerCase(Locale.ROOT))
-                .anyMatch("databasename=desco_db_dev"::equals);
+                .anyMatch(value -> "databasename=desco_db".equals(value)
+                        || "databasename=desco_db_dev".equals(value) || "databasename=desco_db_dev2".equals(value));
     }
 
     private static boolean isLoopback(String configuredAddress) {

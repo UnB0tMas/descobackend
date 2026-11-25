@@ -11,6 +11,8 @@ import com.franco.desco.adapter.out.persistence.e5.E5ExtrasSqlServerAdapter;
 import com.franco.desco.application.shared.ApplicationResults;
 import com.franco.desco.application.shared.AppStatus;
 import com.franco.desco.application.shared.PersistenceResult;
+import com.franco.desco.application.shared.AppResult;
+import com.franco.desco.application.shared.service.EmailValidationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -37,9 +39,12 @@ public class E5ExtrasController {
     private final ApiResponseFactory responses;
     private final JwtSessionIdentityResolver identity;
     private final ClientRequestContextResolver metadata;
+    private final EmailValidationService emailValidation;
     public E5ExtrasController(E5ExtrasSqlServerAdapter sql,ApiResponseFactory responses,
-        JwtSessionIdentityResolver identity,ClientRequestContextResolver metadata) {
+        JwtSessionIdentityResolver identity,ClientRequestContextResolver metadata,
+        EmailValidationService emailValidation) {
         this.sql=sql;this.responses=responses;this.identity=identity;this.metadata=metadata;
+        this.emailValidation=emailValidation;
     }
 
     private <T> ResponseEntity<ApiResponse<T>> fromPersistence(PersistenceResult<T> result,
@@ -95,6 +100,9 @@ public class E5ExtrasController {
     public ResponseEntity<ApiResponse<E5ExtrasWebTypes.ReceptorRegistrado>> asegurarReceptor(
         @PathVariable @Positive Long liquidacionId,@Valid @RequestBody E5ExtrasWebTypes.Receptor q,
         @Parameter(hidden=true) JwtAuthenticationToken a,@Parameter(hidden=true) HttpServletRequest r) {
+        AppResult<E5ExtrasWebTypes.ReceptorRegistrado> error = q.identityId() == null
+                ? emailValidation.required(q.correo()) : emailValidation.ifProvided(q.correo());
+        if (error != null) return responses.from(error, r);
         Map<String,Object> d=new LinkedHashMap<>();
         d.put("tipoDocumento",q.tipoDocumento());d.put("numeroDocumento",q.numeroDocumento());
         d.put("nombres",q.nombres());d.put("apellidoPaterno",q.apellidoPaterno());

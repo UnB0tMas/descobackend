@@ -13,7 +13,7 @@ public final class SaleModels {
     public record Line(Long detailId, Long productId, String product, BigDecimal quantity, Long priceVersionId,
                        BigDecimal unitPrice, BigDecimal unitDiscount, BigDecimal subtotal) {}
     public record Payment(Long paymentId, Integer paymentMethodId, String paymentMethod, BigDecimal amount, String currency,
-                          String operationNumber, LocalDateTime dateTime, Long userId, String status) {}
+                          String operationNumber, LocalDateTime dateTime, Long userId, String status, Long archivoId) {}
     public record Receipt(String type, Long receiptId, String series, Long number, LocalDateTime issuedAt) {}
     public record Detail(Summary sale, List<Line> lines, List<Payment> payments, Receipt receipt) {}
     public record PaymentMethod(Integer id, String code, String name, boolean requiresOperationNumber) {}

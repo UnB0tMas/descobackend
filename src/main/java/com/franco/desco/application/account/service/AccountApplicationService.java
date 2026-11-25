@@ -8,6 +8,7 @@ import com.franco.desco.application.auth.port.out.PasswordHashPort;
 import com.franco.desco.application.auth.port.out.SecurityMailPort;
 import com.franco.desco.application.auth.port.out.SecurityNotificationPort;
 import com.franco.desco.application.shared.*;
+import com.franco.desco.application.shared.service.EmailValidationService;
 import com.franco.desco.domain.account.AccountModels;
 
 import java.util.List;
@@ -21,6 +22,7 @@ public final class AccountApplicationService implements AccountUseCase {
     private final SecurityMailPort mail;
     private final SecurityNotificationPort notifications;
     private final boolean smtpEnabled;
+    private final EmailValidationService emailValidation;
 
     public AccountApplicationService(
             AccountPersistencePort persistence,
@@ -28,7 +30,8 @@ public final class AccountApplicationService implements AccountUseCase {
             OtpPort otp,
             SecurityMailPort mail,
             SecurityNotificationPort notifications,
-            boolean smtpEnabled
+            boolean smtpEnabled,
+            EmailValidationService emailValidation
     ) {
         this.persistence = persistence;
         this.passwordHash = passwordHash;
@@ -36,6 +39,7 @@ public final class AccountApplicationService implements AccountUseCase {
         this.mail = mail;
         this.notifications = notifications;
         this.smtpEnabled = smtpEnabled;
+        this.emailValidation = emailValidation;
     }
 
     @Override
@@ -127,6 +131,9 @@ public final class AccountApplicationService implements AccountUseCase {
         if (command.nuevoCorreo() == null || command.nuevoCorreo().isBlank()) {
             return AppResult.error(AppStatus.BAD_REQUEST, "CORREO_NO_VALIDO", "Ingrese el nuevo correo de seguridad.");
         }
+
+        AppResult<Void> emailError = emailValidation.required(command.nuevoCorreo());
+        if (emailError != null) return emailError;
 
         OtpPort.GeneratedOtp generated = otp.generate();
         PersistenceResult<AccountModels.EmailChangeIssue> result = persistence.requestEmailChange(

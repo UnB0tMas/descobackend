@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.sqlserver.expediente;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 import com.franco.desco.application.expediente.E1Commands;
@@ -122,7 +123,7 @@ public final class E1SqlServerAdapter implements E1PersistencePort {
             contexto.put("endpoint", meta.endpoint());
             base.put("contexto", contexto);
             String entrada = json.writeValueAsString(base);
-            return jdbc.execute((CallableStatementCreator) connection -> {
+            PersistenceResult<T> result = PaTrace.call("prod.PA_ExpedienteProductivo_Ejecutar", action, () -> jdbc.execute((CallableStatementCreator) connection -> {
                 CallableStatement statement = connection.prepareCall("{call prod.PA_ExpedienteProductivo_Ejecutar(?,?,?,?,?,?,?)}");
                 statement.setString(1, action);
                 statement.setNString(2, entrada);
@@ -144,13 +145,49 @@ public final class E1SqlServerAdapter implements E1PersistencePort {
                 }
                 return new PersistenceResult<>(ok, statement.getString(6), statement.getNString(5),
                         (int) statement.getShort(7), value);
-            });
+            }));
+            if (!result.exitoso() && result.httpSugerido() >= 500) {
+                logTechnicalFailure(action, meta.correlacionId());
+                return PersistenceResult.error(result.codigo(),
+                        "No se pudo completar la operación. Intente nuevamente.", result.httpSugerido());
+            }
+            return result;
         } catch (Exception error) {
             log.error("Error de expediente: accion={}, correlacion={}", action, meta.correlacionId(), error);
             return PersistenceResult.error("EXPEDIENTE_SQL_ERROR",
                     "No se pudo completar la operación; revise el contexto y vuelva a intentar.", 503);
         }
     }
+
+    /** Consulta la auditoría únicamente cuando SQL devolvió un error técnico. */
+    private void logTechnicalFailure(String action, java.util.UUID correlationId) {
+        if (correlationId == null) {
+            log.error(">> [PA ERROR SQL/TECNICO] procedimiento=prod.PA_ExpedienteProductivo_Ejecutar accion={} auditoria=sin-correlacion", action);
+            return;
+        }
+        try {
+            var errors = jdbc.query(
+                    "SELECT TOP (1) numero_sql, procedimiento, linea_sql, mensaje_sql "
+                            + "FROM auditoria.ExpedienteErrorTecnico WITH (NOLOCK) "
+                            + "WHERE correlacion_id=? ORDER BY error_id DESC",
+                    (rs, row) -> new SqlFailure(rs.getInt("numero_sql"),
+                            rs.getString("procedimiento"), rs.getInt("linea_sql"),
+                            rs.getString("mensaje_sql")), correlationId);
+            if (errors.isEmpty()) {
+                log.error(">> [PA ERROR SQL/TECNICO] procedimiento=prod.PA_ExpedienteProductivo_Ejecutar accion={} correlacionId={} auditoria=sin-registro",
+                        action, correlationId);
+            } else {
+                SqlFailure failure = errors.getFirst();
+                log.error(">> [PA ERROR SQL/TECNICO] procedimiento=prod.PA_ExpedienteProductivo_Ejecutar accion={} correlacionId={} codigoSQL={} origen={} linea={} detalle={}",
+                        action, correlationId, failure.number(), failure.procedure(), failure.line(), failure.message());
+            }
+        } catch (org.springframework.dao.DataAccessException auditError) {
+            log.error(">> [PA ERROR SQL/TECNICO] procedimiento=prod.PA_ExpedienteProductivo_Ejecutar accion={} correlacionId={} auditoria=no-disponible tipo={}",
+                    action, correlationId, auditError.getClass().getSimpleName());
+        }
+    }
+
+    private record SqlFailure(int number, String procedure, int line, String message) {}
 
     private static String sha256(String text) {
         try {

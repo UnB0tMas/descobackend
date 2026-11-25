@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.in.web.fieldtrip;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.adapter.in.security.JwtSessionIdentityResolver;
 import com.franco.desco.adapter.in.web.common.*;
 import com.franco.desco.adapter.in.web.openapi.OpenApiConstants;
@@ -45,8 +46,8 @@ public class E2CustodiaController {
             @Parameter(hidden=true) JwtAuthenticationToken a,
             @Parameter(hidden=true) HttpServletRequest r){
         try {
-            jdbc.update("EXEC campo.PA_SalidaRecurso_Upd_ObservacionesEntrega ?,?,?,?",
-                identity.resolve(a).usuarioId(),uotId,id,json.writeValueAsString(datos.recursos()));
+            PaTrace.call("campo.PA_SalidaRecurso_Upd_ObservacionesEntrega", () -> jdbc.update("EXEC campo.PA_SalidaRecurso_Upd_ObservacionesEntrega ?,?,?,?",
+                identity.resolve(a).usuarioId(),uotId,id,json.writeValueAsString(datos.recursos())));
             return responses.from(AppResult.<Void>ok("E2_CUSTODIA_ENTREGA","Estado de los recursos registrado.",null),r);
         }catch(DataAccessException e){
             return responses.from(AppResult.<Void>error(AppStatus.BAD_REQUEST,"E2_CUSTODIA_ERROR",

@@ -15,7 +15,7 @@ public final class GpWebTypes {
     @Schema(name="GpParcelaResponse")
     public record Parcela(Long parcelaId,Long predioId,String codigo,String nombre,
                           java.math.BigDecimal areaHa,Boolean estado,String distritoCodigo,Long centroPobladoId,
-                          BigDecimal latitud,BigDecimal longitud) {}
+                          BigDecimal latitud,BigDecimal longitud,String referencia,String observacion) {}
     @Schema(name="GpCatalogoResponse")
     public record Catalogo(String tipo,Long id,Long padreId,String nombre,String descripcion,String codigo) {}
     @Schema(name="GpCatalogoActualizarRequest")
@@ -36,11 +36,12 @@ public final class GpWebTypes {
       Integer cultivoId,Integer especieId,Long variedadId,String variedadNombre,String nombre,LocalDate fechaInicio,
       Boolean estado,String estadoProceso,Integer cantidadAproximada,Integer cantidadExacta,
       BigDecimal superficieAproximadaM2,BigDecimal superficieExactaM2,
-      Long versionActualId,LocalDate fechaUltimoCenso) {}
+      Long versionActualId,LocalDate fechaUltimoCenso,
+      String tipoRiego,String fuenteAgua) {}
     @Schema(name="GpCensoResponse")
     public record Censo(Long censoId,Long actividadId,Integer cantidadAproximada,Integer cantidadExacta,
       BigDecimal superficieAproximadaM2,BigDecimal superficieExactaM2,
-      LocalDate fecha,String observacion,LocalDateTime fechaRegistro,Long usuarioId,
+      LocalDate fecha,String observacion,LocalDateTime fechaRegistro,Long usuarioId,String usuarioNombre,
       List<RazaConteo> razas,List<VariedadSuperficie> variedades) {}
     @Schema(name="GpEventoResponse")
     public record Evento(Long eventoId,Long actividadId,String tipo,String observacion,
@@ -50,7 +51,7 @@ public final class GpWebTypes {
     @Schema(name="GpActividadRevisionResponse")
     public record ActividadRevision(Long revisionId,Long actividadId,String nombreAnterior,
         String nombreNuevo,Boolean estadoAnterior,Boolean estadoNuevo,String motivo,
-        Long usuarioId,LocalDateTime fechaRegistro) {}
+        Long usuarioId,String usuarioNombre,LocalDateTime fechaRegistro) {}
     @Schema(name="GpRazaConteo")
     public record RazaConteo(@NotNull @Positive Integer razaId,
        Integer cantidadAproximada,@NotNull @PositiveOrZero Integer cantidadExacta,String nombre) {
@@ -71,7 +72,8 @@ public final class GpWebTypes {
         @NotBlank @Pattern(regexp="[0-9]{6}") String distritoCodigo,
         @Positive Long centroPobladoId,
         @DecimalMin("-90.0") @DecimalMax("90.0") BigDecimal latitud,
-        @DecimalMin("-180.0") @DecimalMax("180.0") BigDecimal longitud) {
+        @DecimalMin("-180.0") @DecimalMax("180.0") BigDecimal longitud,
+        @Size(max=300) String referencia,@Size(max=500) String observacion) {
         @AssertTrue(message="Indique ambas coordenadas o ninguna") @Schema(hidden=true)
         public boolean isGeoposicionValida() { return (latitud==null)==(longitud==null); }
     }
@@ -81,46 +83,47 @@ public final class GpWebTypes {
         @NotBlank @Pattern(regexp="[0-9]{6}") String distritoCodigo,
         @Positive Long centroPobladoId,
         @DecimalMin("-90.0") @DecimalMax("90.0") BigDecimal latitud,
-        @DecimalMin("-180.0") @DecimalMax("180.0") BigDecimal longitud) {
+        @DecimalMin("-180.0") @DecimalMax("180.0") BigDecimal longitud,
+        @Size(max=300) String referencia,@Size(max=500) String observacion) {
         @AssertTrue(message="Indique ambas coordenadas o ninguna") @Schema(hidden=true)
         public boolean isGeoposicionValida() { return (latitud==null)==(longitud==null); }
     }
     @Schema(name="GpIncidenciaResponse")
     public record Incidencia(Long incidenciaId,Long actividadId,Integer problemaId,String problema,String estado,
       String resultado,BigDecimal afectadaM2,Integer afectadosAnimales,BigDecimal perdidaM2,Integer perdidosAnimales,
-      String descripcion,LocalDateTime fechaRegistro,Long usuarioId,LocalDateTime fechaCierre,
-      String descripcionCierre,Long usuarioCierreId) {}
+      String descripcion,LocalDateTime fechaRegistro,Long usuarioId,String usuarioNombre,LocalDateTime fechaCierre,
+      String descripcionCierre,Long usuarioCierreId,String usuarioCierreNombre) {}
     @Schema(name="GpIncidenciaEditarRequest")
     public record IncidenciaEditar(@NotNull @Positive Integer problemaId,
       @DecimalMin("0.01") @Digits(integer=12,fraction=2) BigDecimal afectadaM2,
-      @Positive Integer afectadosAnimales,@NotBlank @Size(min=3,max=2000) String descripcion,
+      @Positive Integer afectadosAnimales,@Size(max=2000) String descripcion,
       @NotBlank @Size(min=3,max=1000) String motivo) {
       @AssertTrue(message="Indique una afectación correspondiente al rubro") @Schema(hidden=true)
       public boolean isAfectacionValida(){return (afectadaM2==null)!=(afectadosAnimales==null);}
     }
     @Schema(name="GpIncidenciaRevisionResponse")
     public record IncidenciaRevision(Long revisionId,Long incidenciaId,String accion,String motivo,
-      Long usuarioId,LocalDateTime fechaRegistro,Integer problemaAnterior,Integer problemaNuevo,
+      Long usuarioId,String usuarioNombre,LocalDateTime fechaRegistro,Integer problemaAnterior,Integer problemaNuevo,
       BigDecimal afectadaAnterior,BigDecimal afectadaNueva,Integer animalesAnteriores,Integer animalesNuevos,
       String descripcionAnterior,String descripcionNueva) {}
     @Schema(name="GpTratamientoSeguimientoResponse")
     public record TratamientoSeguimiento(Long eventoId,Long incidenciaId,Integer tratamientoId,String tratamiento,
-      String descripcion,LocalDateTime fechaInicio,LocalDateTime fechaFinPrevista,LocalDateTime fechaFinReal,
-      String descripcionCierre,Long usuarioId,String producto,BigDecimal cantidadUtilizada,String unidadUtilizada) {}
+      String estado,String descripcion,LocalDateTime fechaInicio,LocalDateTime fechaFinPrevista,LocalDateTime fechaFinReal,
+      String descripcionCierre,Long usuarioId,String usuarioNombre,String producto,BigDecimal cantidadUtilizada,String unidadUtilizada) {}
     @Schema(name="GpIncidenciaAltaRequest")
     public record IncidenciaAlta(@NotNull @Positive Integer problemaId,
       @DecimalMin("0.01") @Digits(integer=12,fraction=2) BigDecimal afectadaM2,
-      @Positive Integer afectadosAnimales,@NotBlank @Size(min=3,max=2000) String descripcion) {
+      @Positive Integer afectadosAnimales,@Size(max=2000) String descripcion) {
       @AssertTrue(message="Indique solo superficie afectada o animales afectados") @Schema(hidden=true)
       public boolean isAfectacionValida(){return (afectadaM2==null)!=(afectadosAnimales==null);}
     }
     @Schema(name="GpTratamientoAplicarRequest")
     public record TratamientoAplicar(@NotNull @Positive Long incidenciaId,
-      @NotNull @Positive Integer tratamientoId,@NotBlank @Size(min=3,max=2000) String descripcion,
+      @NotNull @Positive Integer tratamientoId,@Size(max=2000) String descripcion,
       LocalDateTime fechaFinPrevista,@Positive Long programacionProductoId,
       @Positive @Digits(integer=16,fraction=3) BigDecimal cantidadUtilizada) {}
     @Schema(name="GpTratamientoFinalizarRequest")
-    public record TratamientoFinalizar(@NotBlank @Size(min=3,max=1000) String descripcion) {}
+    public record TratamientoFinalizar(@Size(max=1000) String descripcion) {}
     @Schema(name="GpIncidenciaCerrarRequest")
     public record IncidenciaCerrar(@DecimalMin("0.00") @Digits(integer=12,fraction=2) BigDecimal perdidaM2,
       @PositiveOrZero Integer perdidosAnimales,@NotBlank @Size(min=3,max=2000) String descripcion) {
@@ -136,7 +139,8 @@ public final class GpWebTypes {
         @PositiveOrZero Integer cantidadAproximada,@PositiveOrZero Integer cantidadExacta,
         @DecimalMin("0.00") @Digits(integer=12,fraction=2) BigDecimal superficieAproximadaM2,
         @DecimalMin("0.00") @Digits(integer=12,fraction=2) BigDecimal superficieExactaM2,
-        List<@Valid RazaConteo> razas,List<@Valid VariedadSuperficie> variedades) {
+        List<@Valid RazaConteo> razas,List<@Valid VariedadSuperficie> variedades,
+        @Size(max=30) String tipoRiego,@Size(max=150) String fuenteAgua) {
         @AssertTrue(message="Indique superficie exacta y, para crianzas, también cantidad exacta")
         @Schema(hidden=true)
         public boolean isValida() {
@@ -146,7 +150,8 @@ public final class GpWebTypes {
                 || "CRIANZA".equals(rubro) && especieId!=null && cultivoId==null
                 && (cantidadExacta!=null && cantidadExacta>0) && cantidadAproximada==null
                 && superficieAproximadaM2==null && superficieExactaM2!=null && superficieExactaM2.signum()>0 && variedadId==null
-                && (variedades==null || variedades.isEmpty());
+                && (variedades==null || variedades.isEmpty())
+                && tipoRiego==null && fuenteAgua==null;
         }
     }
     @Schema(name = "GpActividadEditarRequest")

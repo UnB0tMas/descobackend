@@ -7,7 +7,7 @@ import java.time.Instant;
 public final class SupplyResponses {
     private SupplyResponses() {}
     @Schema(name="SupplySummaryResponse")
-    public record Summary(Long suministroId,Long uotId,String uotCodigo,String uotNombre,String codigo,String nombre,String unidadMedida,boolean estado,BigDecimal stock,BigDecimal stockActual,BigDecimal stockReservado,BigDecimal stockDisponible,BigDecimal stockMinimo,boolean requiereReposicion){}
+    public record Summary(Long suministroId,Long uotId,String uotCodigo,String uotNombre,String codigo,String nombre,String unidadMedida,boolean estado,BigDecimal stock,BigDecimal stockActual,BigDecimal stockReservado,BigDecimal stockDisponible,BigDecimal stockMinimo,boolean requiereReposicion,Long productoId){}
     @Schema(name="SupplyMovementResponse")
     public record Movement(Long suministroMovimientoId,Long suministroId,Long uotId,String uotCodigo,String uotNombre,String codigo,String nombre,String unidadMedida,Long recursoProgramadoId,String tipoMovimiento,BigDecimal cantidad,Instant fechaHora,String documentoReferencia,String observacion,String usuario,BigDecimal saldo){}
     @Schema(name="SupplyCreatedResponse") public record Created(Long suministroId){}

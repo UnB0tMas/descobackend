@@ -12,6 +12,30 @@ class E1WebMapperContratoTest {
     private final E1WebMapper mapper = new E1WebMapper();
 
     @Test
+    void actualizacionDePersonaConservaIdentificadorDeIdentidad() {
+        var entrada = new E1WebTypes.PersonaRequest(47L, "DNI", "12345678", "ANA", "RUIZ",
+                null, null, null, null, null, null, null);
+        var comando = mapper.persona(entrada);
+        assertThat(comando.personaId()).isEqualTo(47L);
+        assertThat(comando.numeroDocumento()).isEqualTo("12345678");
+    }
+
+    @Test
+    void personasSinResultadosDevuelvenListaVacia() {
+        var resultado = mapper.response(new E1Models.Personas(null));
+        assertThat(resultado.items()).isEmpty();
+    }
+
+    @Test
+    void personasConResultadosConservanLosDatos() {
+        var persona = new E1Models.Persona(11L, "DNI", "12345678", "Ana Ruiz");
+        var resultado = mapper.response(new E1Models.Personas(List.of(persona)));
+        assertThat(resultado.items()).hasSize(1);
+        assertThat(resultado.items().getFirst().personaId()).isEqualTo(11L);
+        assertThat(resultado.items().getFirst().nombreCompleto()).isEqualTo("Ana Ruiz");
+    }
+
+    @Test
     void conservaLaUbicacionYLasColeccionesDelExpediente() {
         var expediente = new E1Models.Expediente(
                 15L, "PRE-15", "Fundo Paltos", "050101", "Cerca del canal",

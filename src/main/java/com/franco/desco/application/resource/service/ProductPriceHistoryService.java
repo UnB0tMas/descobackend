@@ -1,5 +1,6 @@
 package com.franco.desco.application.resource.service;
 
+import com.franco.desco.adapter.out.sqlserver.shared.LoggedSimpleJdbcCall;
 import com.franco.desco.application.shared.AppResult;
 import com.franco.desco.application.shared.AppStatus;
 import com.franco.desco.application.shared.SessionIdentity;
@@ -30,7 +31,7 @@ public class ProductPriceHistoryService {
     private final SimpleJdbcCall reactivateCall;
 
     public ProductPriceHistoryService(JdbcTemplate jdbcTemplate) {
-        this.historyCall = new SimpleJdbcCall(jdbcTemplate)
+        this.historyCall = new LoggedSimpleJdbcCall(jdbcTemplate, "logistica" + "." + "PA_ProductoPrecio_Sel_Historial")
                 .withSchemaName("logistica")
                 .withProcedureName("PA_ProductoPrecio_Sel_Historial")
                 .withoutProcedureColumnMetaDataAccess()
@@ -46,7 +47,7 @@ public class ProductPriceHistoryService {
                 .returningResultSet("historial", this::mapHistory);
 
 
-        this.versionCall = new SimpleJdbcCall(jdbcTemplate)
+        this.versionCall = new LoggedSimpleJdbcCall(jdbcTemplate, "logistica" + "." + "PA_ProductoPrecio_Ins_VersionComercial")
                 .withSchemaName("logistica")
                 .withProcedureName("PA_ProductoPrecio_Ins_VersionComercial")
                 .withoutProcedureColumnMetaDataAccess()
@@ -66,7 +67,7 @@ public class ProductPriceHistoryService {
                         new SqlOutParameter("nHttpRespuesta", Types.SMALLINT)
                 );
 
-        this.reactivateCall = new SimpleJdbcCall(jdbcTemplate)
+        this.reactivateCall = new LoggedSimpleJdbcCall(jdbcTemplate, "logistica" + "." + "PA_ProductoPrecio_Ins_ReactivarVersion")
                 .withSchemaName("logistica")
                 .withProcedureName("PA_ProductoPrecio_Ins_ReactivarVersion")
                 .withoutProcedureColumnMetaDataAccess()

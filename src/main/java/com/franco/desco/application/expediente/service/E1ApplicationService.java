@@ -4,6 +4,7 @@ import com.franco.desco.application.expediente.E1Commands;
 import com.franco.desco.application.expediente.port.in.E1UseCase;
 import com.franco.desco.application.expediente.port.out.E1PersistencePort;
 import com.franco.desco.application.shared.*;
+import com.franco.desco.application.shared.service.EmailValidationService;
 import com.franco.desco.domain.expediente.E1Models;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -13,9 +14,11 @@ import org.slf4j.LoggerFactory;
 public final class E1ApplicationService implements E1UseCase {
     private static final Logger log = LoggerFactory.getLogger(E1ApplicationService.class);
     private final E1PersistencePort persistence;
+    private final EmailValidationService emailValidation;
 
-    public E1ApplicationService(E1PersistencePort persistence) {
+    public E1ApplicationService(E1PersistencePort persistence, EmailValidationService emailValidation) {
         this.persistence = persistence;
+        this.emailValidation = emailValidation;
     }
 
     @Override
@@ -28,7 +31,8 @@ public final class E1ApplicationService implements E1UseCase {
     public AppResult<E1Models.Personas> searchPersonas(E1Commands.SearchPersonas c, SessionIdentity i, RequestMetadata m) {
         AppResult<E1Models.Personas> error = validateContext(c.uotId(), null, null);
         if (error != null) return error;
-        if (c.buscar() == null || c.buscar().trim().length() < 3) {
+        // Sin criterio, consulta el padrón de la UOT; con criterio, protege la búsqueda global.
+        if (c.buscar() != null && !c.buscar().isBlank() && c.buscar().trim().length() < 3) {
             return AppResult.error(AppStatus.BAD_REQUEST, "BUSQUEDA_INVALIDA", "Ingrese al menos tres caracteres para buscar una persona.");
         }
         return ok(persistence.searchPersonas(c, i, m));
@@ -37,7 +41,9 @@ public final class E1ApplicationService implements E1UseCase {
     @Override
     public AppResult<E1Models.Identificador> createPersona(E1Commands.CreatePersona c, SessionIdentity i, RequestMetadata m) {
         AppResult<E1Models.Identificador> error = validateContext(c.uotId(), null, null);
-        return error != null ? error : created(persistence.createPersona(c, i, m));
+        if (error != null) return error;
+        AppResult<E1Models.Identificador> emailError = emailValidation.required(c.persona() == null ? null : c.persona().correo());
+        return emailError != null ? emailError : created(persistence.createPersona(c, i, m));
     }
 
     @Override
@@ -65,12 +71,12 @@ public final class E1ApplicationService implements E1UseCase {
         if (c.convenioId() == null) {
             var p = c.predio();
             if (p == null || p.areaTotalHa() == null || p.areaTotalHa().signum() <= 0 ||
-                    p.areaCultivableHa() == null || p.areaCultivableHa().signum() < 0 ||
-                    p.areaCultivableHa().compareTo(p.areaTotalHa()) > 0 ||
-                    p.tipoRiego() == null || p.tipoRiego().isBlank() || p.tipoRiego().length() > 30 ||
+                    (p.areaCultivableHa() != null && (p.areaCultivableHa().signum() < 0 ||
+                            p.areaCultivableHa().compareTo(p.areaTotalHa()) > 0)) ||
+                    (p.tipoRiego() != null && p.tipoRiego().length() > 30) ||
                     p.latitud() == null || p.longitud() == null) {
                 return AppResult.error(AppStatus.BAD_REQUEST, "PREDIO_INCOMPLETO",
-                        "Complete la ubicación y los datos productivos del fundo.");
+                        "Complete los datos obligatorios del fundo.");
             }
         }
         return created(persistence.createPredio(c, i, m));

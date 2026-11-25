@@ -52,7 +52,7 @@ public class SaleController {
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.hasUot(authentication,'POS_OPERAR')")
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'VENTAS_HISTORIAL')")
     @Operation(operationId = "ventasListar", summary = "Listar ventas según contexto UOT")
     public ResponseEntity<ApiResponse<List<SaleResponses.Summary>>> list(
             @RequestParam(required = false) @Positive Long uotId,
@@ -68,7 +68,7 @@ public class SaleController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@permissionGuard.hasUot(authentication,'POS_OPERAR')")
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'POS_OPERAR') || @permissionGuard.hasUot(authentication,'VENTAS_HISTORIAL')")
     @Operation(operationId = "ventasVer", summary = "Ver detalle, pagos y comprobante de una venta")
     public ResponseEntity<ApiResponse<SaleResponses.Detail>> get(
             @PathVariable @Positive Long id,
@@ -217,7 +217,7 @@ public class SaleController {
                 useCase.pay(
                         identities.resolve(authentication),
                         new SaleCommands.Pay(
-                                id, body.metodoPagoId(), body.importe(), idempotency.required(request), body.numeroOperacion()
+                                id, body.metodoPagoId(), body.importe(), idempotency.required(request), body.numeroOperacion(), body.archivoId()
                         )
                 ),
                 request,
@@ -245,7 +245,7 @@ public class SaleController {
 
     @PostMapping("/{id}/anular")
     @IdempotentOperation
-    @PreAuthorize("@permissionGuard.hasUot(authentication,'POS_OPERAR')")
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'VENTAS_ANULAR')")
     @Operation(operationId = "ventasAnular", summary = "Anular una venta sin pagos activos")
     public ResponseEntity<ApiResponse<Void>> cancel(
             @PathVariable @Positive Long id,
@@ -256,7 +256,7 @@ public class SaleController {
         return responses.from(
                 useCase.cancel(
                         identities.resolve(authentication),
-                        new SaleCommands.Cancel(id, body.motivo())
+                        new SaleCommands.Cancel(id, body.motivo(), body.devolucionConfirmada())
                 ),
                 request
         );
@@ -264,7 +264,7 @@ public class SaleController {
 
     @PostMapping("/pagos/{id}/anular")
     @IdempotentOperation
-    @PreAuthorize("@permissionGuard.hasUot(authentication,'POS_OPERAR')")
+    @PreAuthorize("@permissionGuard.hasUot(authentication,'VENTAS_ANULAR')")
     @Operation(operationId = "ventasPagoAnular", summary = "Anular un pago registrado")
     public ResponseEntity<ApiResponse<Void>> cancelPayment(
             @PathVariable @Positive Long id,

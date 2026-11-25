@@ -1,8 +1,10 @@
 package com.franco.desco.application.sale.service;
 
+import com.franco.desco.adapter.out.sqlserver.shared.LoggedSimpleJdbcCall;
 import com.franco.desco.application.shared.AppResult;
 import com.franco.desco.application.shared.AppStatus;
 import com.franco.desco.application.shared.SessionIdentity;
+import com.franco.desco.application.shared.service.EmailValidationService;
 import com.franco.desco.domain.sale.SaleModels;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -27,16 +29,18 @@ public class SaleSupportService {
     private static final int SQL_SERVER_GUID = -145;
 
     private final JsonMapper jsonMapper;
+    private final EmailValidationService emailValidation;
     private final SimpleJdbcCall paymentMethodsCall;
     private final SimpleJdbcCall manualCustomerCall;
     private final SimpleJdbcCall technicalEmployeesCall;
     private final SimpleJdbcCall technicalDeliveriesCall;
     private final SimpleJdbcCall technicalDeliveryCall;
 
-    public SaleSupportService(JdbcTemplate jdbcTemplate, JsonMapper jsonMapper) {
+    public SaleSupportService(JdbcTemplate jdbcTemplate, JsonMapper jsonMapper, EmailValidationService emailValidation) {
         this.jsonMapper = jsonMapper;
+        this.emailValidation = emailValidation;
 
-        this.paymentMethodsCall = new SimpleJdbcCall(jdbcTemplate)
+        this.paymentMethodsCall = new LoggedSimpleJdbcCall(jdbcTemplate, "comercial" + "." + "PA_Venta_Sel_MetodosPago")
                 .withSchemaName("comercial")
                 .withProcedureName("PA_Venta_Sel_MetodosPago")
                 .withoutProcedureColumnMetaDataAccess()
@@ -49,7 +53,7 @@ public class SaleSupportService {
                 )
                 .returningResultSet("metodosPago", this::mapPaymentMethod);
 
-        this.manualCustomerCall = new SimpleJdbcCall(jdbcTemplate)
+        this.manualCustomerCall = new LoggedSimpleJdbcCall(jdbcTemplate, "comercial" + "." + "PA_Cliente_Ins_Manual")
                 .withSchemaName("comercial")
                 .withProcedureName("PA_Cliente_Ins_Manual")
                 .withoutProcedureColumnMetaDataAccess()
@@ -66,7 +70,7 @@ public class SaleSupportService {
                         commonOut("cCodigoRespuesta", Types.VARCHAR), commonOut("nHttpRespuesta", Types.SMALLINT)
                 );
 
-        this.technicalEmployeesCall = new SimpleJdbcCall(jdbcTemplate)
+        this.technicalEmployeesCall = new LoggedSimpleJdbcCall(jdbcTemplate, "logistica" + "." + "PA_EntregaTecnica_Sel_Empleados")
                 .withSchemaName("logistica")
                 .withProcedureName("PA_EntregaTecnica_Sel_Empleados")
                 .withoutProcedureColumnMetaDataAccess()
@@ -77,7 +81,7 @@ public class SaleSupportService {
                 )
                 .returningResultSet("empleados", this::mapEmployee);
 
-        this.technicalDeliveriesCall = new SimpleJdbcCall(jdbcTemplate)
+        this.technicalDeliveriesCall = new LoggedSimpleJdbcCall(jdbcTemplate, "logistica" + "." + "PA_EntregaTecnica_Sel_Listado")
                 .withSchemaName("logistica")
                 .withProcedureName("PA_EntregaTecnica_Sel_Listado")
                 .withoutProcedureColumnMetaDataAccess()
@@ -88,7 +92,7 @@ public class SaleSupportService {
                 )
                 .returningResultSet("entregas", this::mapTechnicalDelivery);
 
-        this.technicalDeliveryCall = new SimpleJdbcCall(jdbcTemplate)
+        this.technicalDeliveryCall = new LoggedSimpleJdbcCall(jdbcTemplate, "logistica" + "." + "PA_EntregaTecnica_Ins_Registrar")
                 .withSchemaName("logistica")
                 .withProcedureName("PA_EntregaTecnica_Ins_Registrar")
                 .withoutProcedureColumnMetaDataAccess()
@@ -144,6 +148,8 @@ public class SaleSupportService {
             String names, String paternalSurname, String maternalSurname, String businessName, String phone, String email
     ) {
         if (identity == null || identity.usuarioId() == null) return unauthorized();
+        AppResult<SaleModels.CustomerReference> emailError = emailValidation.required(email);
+        if (emailError != null) return emailError;
         try {
             Map<String, Object> out = manualCustomerCall.execute(new MapSqlParameterSource()
                     .addValue("nUsuarioId", identity.usuarioId()).addValue("nUotId", uotId)

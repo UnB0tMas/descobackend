@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.persistence.planta.clinical;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.shared.PersistenceResult;
 import com.franco.desco.application.shared.RequestMetadata;
 import com.franco.desco.application.shared.SessionIdentity;
@@ -44,7 +45,7 @@ abstract class E3ClinicalSqlOperation implements E3ClinicalOperation {
         Map<String,Object> peticion=Map.of("contexto",contexto,"filtros",filtros,"datos",datos==null?Map.of():datos);
         String payload=json.writeValueAsString(peticion);
         try {
-            return jdbc.execute((ConnectionCallback<PersistenceResult<Object>>) connection -> {
+            return PaTrace.call(procedure, () -> jdbc.execute((ConnectionCallback<PersistenceResult<Object>>) connection -> {
                 try(CallableStatement call=connection.prepareCall("{call "+procedure+"(?,?,?,?,?,?)}")) {
                     call.setNString(1,payload);
                     call.registerOutParameter(2,Types.LONGNVARCHAR);
@@ -61,7 +62,7 @@ abstract class E3ClinicalSqlOperation implements E3ClinicalOperation {
                     Object value=raw==null||raw.isBlank()?null:json.readValue(raw,Object.class);
                     return PersistenceResult.ok(code,message,http==0?200:http,value);
                 }
-            });
+            }));
         }catch(DataAccessException ex){
             return PersistenceResult.error("E3_BD_NO_DISPONIBLE","No fue posible completar la operación.",503);
         }

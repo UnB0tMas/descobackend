@@ -9,6 +9,7 @@ import com.franco.desco.adapter.in.web.openapi.OpenApiConstants;
 import com.franco.desco.application.shared.AppResult;
 import com.franco.desco.application.shared.AppStatus;
 import com.franco.desco.application.shared.PersistenceResult;
+import com.franco.desco.application.shared.service.EmailValidationService;
 import com.franco.desco.infrastructure.persistence.campaign.CampaignPlanningSqlAdapter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -36,13 +37,16 @@ public class ApappssBuyerController {
     private final ApiResponseFactory responses;
     private final JwtSessionIdentityResolver identities;
     private final ClientRequestContextResolver metadata;
+    private final EmailValidationService emailValidation;
 
     public ApappssBuyerController(CampaignPlanningSqlAdapter sql, ApiResponseFactory responses,
-            JwtSessionIdentityResolver identities, ClientRequestContextResolver metadata) {
+            JwtSessionIdentityResolver identities, ClientRequestContextResolver metadata,
+            EmailValidationService emailValidation) {
         this.sql = sql;
         this.responses = responses;
         this.identities = identities;
         this.metadata = metadata;
+        this.emailValidation = emailValidation;
     }
 
     public record BuyerRequest(
@@ -134,7 +138,9 @@ public class ApappssBuyerController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> create(@RequestParam @Positive Long uotId,
             @Valid @RequestBody BuyerRequest body,
             @Parameter(hidden=true) JwtAuthenticationToken auth, @Parameter(hidden=true) HttpServletRequest request) {
-        return call("PA_APAPPSS_Comprador_Ins_Registro", Map.of("uotId", uotId), body, auth, request);
+        AppResult<Map<String, Object>> error = emailValidation.required(body.correo());
+        return error != null ? responses.from(error, request)
+                : call("PA_APAPPSS_Comprador_Ins_Registro", Map.of("uotId", uotId), body, auth, request);
     }
 
     public record BuyerUpdateRequest(
@@ -172,7 +178,9 @@ public class ApappssBuyerController {
             @Valid @RequestBody BuyerUpdateRequest body,
             @Parameter(hidden=true) JwtAuthenticationToken auth,
             @Parameter(hidden=true) HttpServletRequest request) {
-        return call("PA_APAPPSS_Comprador_Upd_Datos", Map.of("uotId", uotId, "compradorId", id),
+        AppResult<Map<String, Object>> error = emailValidation.ifProvided(body.correo());
+        return error != null ? responses.from(error, request)
+                : call("PA_APAPPSS_Comprador_Upd_Datos", Map.of("uotId", uotId, "compradorId", id),
                 body, auth, request);
     }
 

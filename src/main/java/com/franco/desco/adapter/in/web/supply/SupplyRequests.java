@@ -21,6 +21,7 @@ public final class SupplyRequests {
             @NotNull @Positive Long uotId,
             @Schema(description = "Código del suministro. Si se omite o queda vacío, DESCO genera uno sugerido para la UOT.")
             @Size(max = 40) String codigo,
+            @Positive Long productoId,
             @NotBlank @Size(max = 150) String nombre,
             @Schema(description = "Código del catálogo UNIDAD_MEDIDA.")
             @NotBlank @Size(max = 20) String unidadMedida,
@@ -32,6 +33,7 @@ public final class SupplyRequests {
     @Schema(name = "SupplyUpdateRequest")
     public record Update(
             @NotNull @Positive Long uotId,
+            @Positive Long productoId,
             @NotBlank @Size(max = 150) String nombre,
             @Schema(description = "Código del catálogo UNIDAD_MEDIDA.")
             @NotBlank @Size(max = 20) String unidadMedida,

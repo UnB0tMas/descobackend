@@ -31,6 +31,13 @@ public final class UotCommands {
             boolean defaultUnit
     ) {}
 
+    public record AssignAccess(
+            Long userId,
+            Long uotId,
+            Long roleId,
+            boolean defaultUnit
+    ) {}
+
     public record AssignRole(
             Long userId,
             Long uotId,

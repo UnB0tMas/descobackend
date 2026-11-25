@@ -171,6 +171,15 @@ public class UotController {
             @Parameter(hidden = true) JwtAuthenticationToken authentication,
             @Parameter(hidden = true) HttpServletRequest request
     ) {
+        if (body.rolId() != null) {
+            return responses.from(
+                    useCase.assignAccess(
+                            new UotCommands.AssignAccess(body.usuarioId(), uotId, body.rolId(), body.predeterminada()),
+                            identities.resolve(authentication)
+                    ),
+                    request
+            );
+        }
         return responses.from(
                 useCase.assignUser(
                         new UotCommands.AssignUser(body.usuarioId(), uotId, body.predeterminada()),

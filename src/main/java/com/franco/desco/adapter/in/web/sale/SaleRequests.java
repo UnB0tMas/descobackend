@@ -44,11 +44,12 @@ public final class SaleRequests {
     public record Pay(
             @NotNull @Positive Integer metodoPagoId,
             @NotNull @Positive BigDecimal importe,
-            @Size(max = 120) String numeroOperacion
+            @Size(max = 120) String numeroOperacion,
+            @Positive Long archivoId
     ) {}
 
     @Schema(name = "SaleCancelRequest")
-    public record Cancel(@NotBlank @Size(max = 500) String motivo) {}
+    public record Cancel(@NotBlank @Size(min = 5,max = 500) String motivo, boolean devolucionConfirmada) {}
 
     @Schema(name = "SalePaymentCancelRequest")
     public record CancelPayment(@NotBlank @Size(max = 400) String motivo) {}

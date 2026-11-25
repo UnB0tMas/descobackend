@@ -1,5 +1,6 @@
 package com.franco.desco.application.catalog.service;
 
+import com.franco.desco.adapter.out.sqlserver.shared.LoggedSimpleJdbcCall;
 import com.franco.desco.application.catalog.CatalogCommands.CreateCatalog;
 import com.franco.desco.application.catalog.CatalogCommands.DisableCatalog;
 import com.franco.desco.application.catalog.CatalogCommands.ListCatalog;
@@ -235,7 +236,7 @@ public class ResourceCatalogService {
         all[parameters.length + 1] = new SqlOutParameter("cMensaje", Types.NVARCHAR);
         all[parameters.length + 2] = new SqlOutParameter("cCodigoRespuesta", Types.VARCHAR);
         all[parameters.length + 3] = new SqlOutParameter("nHttpRespuesta", Types.SMALLINT);
-        return new SimpleJdbcCall(dataSource)
+        return new LoggedSimpleJdbcCall(dataSource, "config" + "." + procedure)
                 .withSchemaName("config")
                 .withProcedureName(procedure)
                 .withoutProcedureColumnMetaDataAccess()

@@ -31,7 +31,8 @@ public final class ResourceModels {
             String observation,
             Long mainImageFileId,
             int openIncidents,
-            boolean active
+            boolean active,
+            boolean technicalUse
     ) {
     }
 
@@ -63,6 +64,7 @@ public final class ResourceModels {
             Long mainImageFileId,
             int openIncidents,
             boolean active,
+            boolean technicalUse,
             long totalRecords
     ) {
     }

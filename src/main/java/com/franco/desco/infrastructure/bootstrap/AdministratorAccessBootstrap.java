@@ -128,6 +128,79 @@ public class AdministratorAccessBootstrap implements ApplicationRunner {
                 ADMIN_ROLE
         );
 
+        // Asignaciones explícitas de todos los permisos ordinarios al administrador activo,
+        // limitadas a sus UOT vigentes. Se incluyen las cargas de Gestión Productiva.
+        // Los módulos especiales siguen dependiendo del convenio y no se incluyen aquí.
+        int ordinaryRestored = jdbc.update(
+                """
+                UPDATE UP
+                SET UP.permitido=1,
+                    UP.motivo=N'Permiso ordinario del administrador',
+                    UP.fecha_desde=CASE WHEN UP.fecha_desde>SYSUTCDATETIME()
+                                        THEN SYSUTCDATETIME() ELSE UP.fecha_desde END
+                FROM seg.UsuarioUOTPermiso UP
+                JOIN seg.UsuarioUOT UU ON UU.usuario_uot_id=UP.usuario_uot_id
+                JOIN seg.Usuario U ON U.usuario_id=UU.usuario_id
+                    AND U.estado=1 AND U.estado_cuenta='ACTIVA'
+                JOIN org.UOT O ON O.uot_id=UU.uot_id AND O.estado=1
+                JOIN seg.Permiso P ON P.permiso_id=UP.permiso_id AND P.estado=1
+                JOIN seg.Modulo M ON M.modulo_id=P.modulo_id AND M.estado=1
+                WHERE UU.estado=1 AND UU.fecha_desde<=SYSUTCDATETIME()
+                  AND (UU.fecha_hasta IS NULL OR UU.fecha_hasta>SYSUTCDATETIME())
+                  AND UP.estado=1
+                  AND (UP.fecha_hasta IS NULL OR UP.fecha_hasta>SYSUTCDATETIME())
+                  AND (UP.permitido=0 OR UP.fecha_desde>SYSUTCDATETIME())
+                  AND NOT EXISTS (
+                      SELECT 1 FROM seg.ModuloEspecialPermiso MP
+                      WHERE MP.permiso_id=P.permiso_id
+                  )
+                  AND EXISTS (
+                      SELECT 1 FROM seg.UsuarioRol UR
+                      JOIN seg.Rol R ON R.rol_id=UR.rol_id
+                          AND R.codigo=? AND R.estado=1
+                      WHERE UR.usuario_id=U.usuario_id AND UR.estado=1
+                        AND UR.fecha_desde<=SYSUTCDATETIME()
+                        AND (UR.fecha_hasta IS NULL OR UR.fecha_hasta>SYSUTCDATETIME())
+                  )
+                """, ADMIN_ROLE
+        );
+
+        int ordinaryGranted = jdbc.update(
+                """
+                INSERT INTO seg.UsuarioUOTPermiso
+                    (usuario_uot_id, permiso_id, permitido, motivo, fecha_desde, estado)
+                SELECT UU.usuario_uot_id, P.permiso_id, 1,
+                       N'Permiso ordinario del administrador', SYSUTCDATETIME(), 1
+                FROM seg.UsuarioUOT UU
+                JOIN seg.Usuario U ON U.usuario_id=UU.usuario_id
+                    AND U.estado=1 AND U.estado_cuenta='ACTIVA'
+                JOIN org.UOT O ON O.uot_id=UU.uot_id AND O.estado=1
+                JOIN seg.Permiso P ON P.estado=1
+                JOIN seg.Modulo M ON M.modulo_id=P.modulo_id AND M.estado=1
+                WHERE UU.estado=1 AND UU.fecha_desde<=SYSUTCDATETIME()
+                  AND (UU.fecha_hasta IS NULL OR UU.fecha_hasta>SYSUTCDATETIME())
+                  AND NOT EXISTS (
+                      SELECT 1 FROM seg.ModuloEspecialPermiso MP
+                      WHERE MP.permiso_id=P.permiso_id
+                  )
+                  AND EXISTS (
+                      SELECT 1 FROM seg.UsuarioRol UR
+                      JOIN seg.Rol R ON R.rol_id=UR.rol_id
+                          AND R.codigo=? AND R.estado=1
+                      WHERE UR.usuario_id=U.usuario_id AND UR.estado=1
+                        AND UR.fecha_desde<=SYSUTCDATETIME()
+                        AND (UR.fecha_hasta IS NULL OR UR.fecha_hasta>SYSUTCDATETIME())
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM seg.UsuarioUOTPermiso UP WITH (UPDLOCK, HOLDLOCK)
+                      WHERE UP.usuario_uot_id=UU.usuario_uot_id
+                        AND UP.permiso_id=P.permiso_id AND UP.estado=1
+                        AND UP.fecha_desde<=SYSUTCDATETIME()
+                        AND (UP.fecha_hasta IS NULL OR UP.fecha_hasta>SYSUTCDATETIME())
+                  )
+                """, ADMIN_ROLE
+        );
+
         // Los permisos especiales siguen exigiendo una concesión individual por UOT.
         // Se sincronizan TODOS los permisos del módulo especial, no solo socios/predios.
         // No se habilitan convenios inexistentes o inactivos ni se revierten denegaciones vigentes.
@@ -192,8 +265,8 @@ public class AdministratorAccessBootstrap implements ApplicationRunner {
             throw new IllegalStateException("Faltan permisos APAPPSS_PAGOS para ADMINISTRADOR. Verificar V668.");
         }
         log.info(
-                "[BOOTSTRAP] ADMINISTRADOR: permisos nuevos={}, reactivados={}, UOT nuevas={}, roles UOT nuevos={}, autorizaciones APAPPSS nuevas={}, pagos socios={}",
-                created, restored, uots, uotRoles, apappss, pagosSocios
+                "[BOOTSTRAP] ADMINISTRADOR: rol nuevos={}, rol restaurados={}, UOT nuevas={}, roles UOT nuevos={}, permisos UOT nuevos={}, permisos UOT restaurados={}, APAPPSS nuevos={}, pagos socios={}",
+                created, restored, uots, uotRoles, ordinaryGranted, ordinaryRestored, apappss, pagosSocios
         );
     }
 }

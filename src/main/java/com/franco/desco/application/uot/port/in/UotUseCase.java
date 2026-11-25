@@ -15,4 +15,5 @@ public interface UotUseCase {
     AppResult<Void> update(UotCommands.UpdateUnit command, SessionIdentity identity);
     AppResult<Void> assignUser(UotCommands.AssignUser command, SessionIdentity identity);
     AppResult<Void> assignRole(UotCommands.AssignRole command, SessionIdentity identity);
+    AppResult<Void> assignAccess(UotCommands.AssignAccess command, SessionIdentity identity);
 }

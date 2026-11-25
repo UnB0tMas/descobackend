@@ -1,0 +1,67 @@
+IF OBJECT_ID(N'[prod].[PA_E3_Enfermedad_Sel_Detalle]') IS NOT NULL
+    DROP PROCEDURE [prod].[PA_E3_Enfermedad_Sel_Detalle];
+GO
+
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+/******************************************************************************************************
+' Nombre del PA            : prod.PA_E3_Enfermedad_Sel_Detalle
+' Descripción            : Consulta información de E3 Enfermedad (detalle).
+' Aplicativo / Módulo    : DESCO / prod
+*******************************************************************************************************/
+CREATE   PROCEDURE prod.PA_E3_Enfermedad_Sel_Detalle
+ @cJson NVARCHAR(MAX), @cDatos NVARCHAR(MAX) OUTPUT, @bResultado BIT OUTPUT,
+ @cMensaje NVARCHAR(300) OUTPUT,@cCodigoRespuesta VARCHAR(60) OUTPUT,@nHttpRespuesta SMALLINT OUTPUT
+AS
+BEGIN
+ SET NOCOUNT ON; SET XACT_ABORT ON;
+ SELECT @cDatos=NULL,@bResultado=0,@cMensaje=N'No fue posible completar la operación.',@cCodigoRespuesta='E3_ERROR',@nHttpRespuesta=400;
+ DECLARE @usuario BIGINT,@planta BIGINT,@episodio BIGINT,@now DATETIME2(0)=SYSUTCDATETIME();
+ BEGIN TRY
+ EXEC prod.PA_E3_Sel_ValidarContexto @cJson,'APAPPSS_PREDIOS_VER',@usuario OUTPUT,@planta OUTPUT,@episodio OUTPUT;
+ IF @episodio IS NULL THROW 51215,N'Seleccione una enfermedad válida.',1;
+
+ SET @cDatos=(SELECT E.episodio_id episodioId,E.planta_id plantaId,E.gp_problema_id diagnosticoId,
+  COALESCE(GP.nombre,TP.nombre) enfermedad,
+  CASE WHEN E.activo=0 THEN 'ELIMINADA' WHEN E.cierre_por_muerte=1 OR (P.estado_actual='MUERTA' AND E.fin IS NULL) THEN 'NO_CONTROLADA' WHEN E.fin IS NULL THEN 'VIGENTE' ELSE 'RECUPERADA' END estado,
+  E.observacion, E.motivo_cierre motivoCierre,
+  CONVERT(VARCHAR(19),E.inicio,126)+'Z' fechaDiagnostico,
+  CASE WHEN E.fin IS NULL OR E.cierre_por_muerte=1 THEN NULL ELSE CONVERT(VARCHAR(19),E.fin,126)+'Z' END fechaCuracion,
+  CASE WHEN E.fin IS NULL THEN NULL ELSE CONVERT(VARCHAR(19),E.fin,126)+'Z' END fechaCierre,
+  CASE WHEN P.estado_actual='MUERTA' AND E.fin IS NULL THEN NULL ELSE DATEDIFF(DAY,CONVERT(DATE,E.inicio),CONVERT(DATE,COALESCE(E.fin,@now)))+1 END diasEnferma,
+  E.usuario_apertura_id usuarioRegistroId,seg.FN_Usuario_NombreCompleto(UA.usuario_id) registradoPor,
+  E.usuario_cierre_id usuarioCuracionId,seg.FN_Usuario_NombreCompleto(UC.usuario_id) curadoPor,
+  E.eliminado_por_usuario_id usuarioEliminacionId,seg.FN_Usuario_NombreCompleto(UE.usuario_id) eliminadoPor,
+  CASE WHEN E.eliminado_en IS NULL THEN NULL ELSE CONVERT(VARCHAR(19),E.eliminado_en,126)+'Z' END fechaEliminacion,
+  JSON_QUERY((SELECT T.tratamiento_id tratamientoId,T.gp_tratamiento_id catalogoTratamientoId,
+   T.descripcion,T.resultado,T.comentario,
+   CONVERT(VARCHAR(19),T.fecha_aplicacion,126)+'Z' fechaAplicacion,
+   CONVERT(VARCHAR(19),T.fecha_registro,126)+'Z' fechaRegistro,
+   T.usuario_id usuarioId,seg.FN_Usuario_NombreCompleto(UT.usuario_id) usuarioNombre,
+   T.modificado_por_usuario_id modificadoPorUsuarioId,seg.FN_Usuario_NombreCompleto(UM.usuario_id) modificadoPorNombre,
+   CASE WHEN T.modificado_en IS NULL THEN NULL ELSE CONVERT(VARCHAR(19),T.modificado_en,126)+'Z' END modificadoEn
+   FROM sanidad.TratamientoPlantaE3 T LEFT JOIN seg.Usuario UT ON UT.usuario_id=T.usuario_id
+   LEFT JOIN seg.Usuario UM ON UM.usuario_id=T.modificado_por_usuario_id
+   WHERE T.episodio_id=E.episodio_id ORDER BY T.fecha_aplicacion DESC,T.tratamiento_id DESC FOR JSON PATH)) tratamientos
+  FROM sanidad.EpisodioPlantaE3 E
+  JOIN prod.PlantaPaltaE3 P ON P.planta_id=E.planta_id
+  LEFT JOIN prod.GPProblema GP ON GP.problema_id=E.gp_problema_id
+  LEFT JOIN sanidad.TipoProblemaFitosanitario TP ON TP.tipo_problema_fitosanitario_id=E.tipo_problema_fitosanitario_id
+  LEFT JOIN seg.Usuario UA ON UA.usuario_id=E.usuario_apertura_id
+  LEFT JOIN seg.Usuario UC ON UC.usuario_id=E.usuario_cierre_id
+  LEFT JOIN seg.Usuario UE ON UE.usuario_id=E.eliminado_por_usuario_id
+  WHERE E.episodio_id=@episodio FOR JSON PATH,WITHOUT_ARRAY_WRAPPER,INCLUDE_NULL_VALUES);
+
+ SELECT @bResultado=1,@cMensaje=N'Operación realizada.',@cCodigoRespuesta='E3_OK',@nHttpRespuesta=200;
+ END TRY
+ BEGIN CATCH
+  IF @@TRANCOUNT>0 ROLLBACK TRANSACTION;
+  SELECT @bResultado=0,@cDatos=NULL,@nHttpRespuesta=CASE WHEN ERROR_NUMBER() BETWEEN 51200 AND 51299 THEN 400 ELSE 503 END,
+    @cCodigoRespuesta='E3_ERROR',
+    @cMensaje=CASE WHEN ERROR_NUMBER() BETWEEN 51200 AND 51299 THEN ERROR_MESSAGE() ELSE N'No se pudo completar la operación.' END;
+ END CATCH;
+END;
+GO

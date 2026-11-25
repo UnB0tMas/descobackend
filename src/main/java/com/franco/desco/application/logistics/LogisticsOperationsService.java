@@ -1,5 +1,6 @@
 package com.franco.desco.application.logistics;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.shared.AppResult;
 import com.franco.desco.application.shared.AppStatus;
 import com.franco.desco.application.shared.SessionIdentity;
@@ -80,34 +81,87 @@ public final class LogisticsOperationsService {
         return read("PA_ProgramacionProducto_Sel_Detalle",actor,id);
     }
 
+    /**
+     * Las operaciones logísticas comparten el mismo contrato del PA.
+     * Cada ejecución registra inicio, estado funcional y fallo SQL en PaTrace.
+     */
+    private Outcome executeProcedure(
+            String name,
+            SessionIdentity actor,
+            Object[] args,
+            boolean returnId,
+            boolean readRows
+    ) {
+        return PaTrace.call(
+                "logistica." + name,
+                () -> jdbc.execute((ConnectionCallback<Outcome>) connection ->
+                        call(connection, name, actor.usuarioId(), args, returnId, readRows)),
+                response -> response != null && response.success()
+                        && (!returnId || response.id() != null),
+                response -> response == null
+                        ? "Respuesta vacía"
+                        : response.id() == null && returnId && response.success()
+                        ? "El PA no devolvió el identificador esperado. " + response.message()
+                        : response.message()
+        );
+    }
+
     private AppResult<Void> writeVoid(String name, SessionIdentity actor, Object... args) {
-        if (!validActor(actor)) return invalidSession();
+        if (!validActor(actor)) {
+            return invalidSession();
+        }
         try {
-            Outcome out = jdbc.execute((ConnectionCallback<Outcome>) con -> call(con,name,actor.usuarioId(),args,false,false));
-            if (out == null || !out.success()) return error(out);
-            return AppResult.ok("OPERACION_REALIZADA",safeMessage(out.message(),"Acción realizada correctamente."),null);
+            Outcome response = executeProcedure(name, actor, args, false, false);
+            if (response == null || !response.success()) {
+                return error(response);
+            }
+            return AppResult.ok(
+                    "OPERACION_REALIZADA",
+                    safeMessage(response.message(), "Acción realizada correctamente."),
+                    null
+            );
         } catch (DataAccessException exception) {
             return unavailable();
         }
     }
 
-    private AppResult<Long> writeId(String name, SessionIdentity actor,Object... args) {
-        if (!validActor(actor)) return invalidSession();
+    private AppResult<Long> writeId(String name, SessionIdentity actor, Object... args) {
+        if (!validActor(actor)) {
+            return invalidSession();
+        }
         try {
-            Outcome out = jdbc.execute((ConnectionCallback<Outcome>) con -> call(con,name,actor.usuarioId(),args,true,false));
-            if (out == null || !out.success() || out.id() == null) return error(out);
-            return AppResult.created("OPERACION_REGISTRADA",safeMessage(out.message(),"Operación registrada correctamente."),out.id());
+            Outcome response = executeProcedure(name, actor, args, true, false);
+            if (response == null || !response.success() || response.id() == null) {
+                return error(response);
+            }
+            return AppResult.created(
+                    "OPERACION_REGISTRADA",
+                    safeMessage(response.message(), "Operación registrada correctamente."),
+                    response.id()
+            );
         } catch (DataAccessException exception) {
             return unavailable();
         }
     }
 
-    private AppResult<List<Map<String,Object>>> read(String name,SessionIdentity actor,Object... args) {
-        if (!validActor(actor)) return invalidSession();
+    private AppResult<List<Map<String, Object>>> read(
+            String name,
+            SessionIdentity actor,
+            Object... args
+    ) {
+        if (!validActor(actor)) {
+            return invalidSession();
+        }
         try {
-            Outcome out=jdbc.execute((ConnectionCallback<Outcome>) con->call(con,name,actor.usuarioId(),args,false,true));
-            if (out==null || !out.success()) return error(out);
-            return AppResult.ok("CONSULTA_REALIZADA",safeMessage(out.message(),"Consulta realizada correctamente."),out.rows());
+            Outcome response = executeProcedure(name, actor, args, false, true);
+            if (response == null || !response.success()) {
+                return error(response);
+            }
+            return AppResult.ok(
+                    "CONSULTA_REALIZADA",
+                    safeMessage(response.message(), "Consulta realizada correctamente."),
+                    response.rows()
+            );
         } catch (DataAccessException exception) {
             return unavailable();
         }

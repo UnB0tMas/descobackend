@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.persistence.planta;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.shared.PersistenceResult;
 import com.franco.desco.application.shared.RequestMetadata;
 import com.franco.desco.application.shared.SessionIdentity;
@@ -56,7 +57,7 @@ public class E3ExpedienteE4SqlAdapter {
         payload.put("datos", data == null ? Map.of() : data);
         String requestJson = json.writeValueAsString(payload);
         try {
-            return jdbc.execute(connection -> {
+            return PaTrace.call(CALL, action, () -> jdbc.execute(connection -> {
                 CallableStatement statement = connection.prepareCall(CALL);
                 statement.setString(1, action);
                 statement.setNString(2, requestJson);
@@ -95,7 +96,7 @@ public class E3ExpedienteE4SqlAdapter {
                     value = normalized;
                 }
                 return PersistenceResult.ok(code, message, status == 0 ? 200 : status, value);
-            });
+            }));
         } catch (DataAccessException ex) {
             // Nunca devolver SQL, parámetros de sesión ni trazas técnicas al navegador.
             log.error("Error SQL APAPPSS: accion={}, uotId={}, convenioId={}, predioId={}, correlacionId={}",

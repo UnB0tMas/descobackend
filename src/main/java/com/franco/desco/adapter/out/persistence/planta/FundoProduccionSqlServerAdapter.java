@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.persistence.planta;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.shared.PersistenceResult;
 import com.franco.desco.application.shared.RequestMetadata;
 import com.franco.desco.application.shared.SessionIdentity;
@@ -44,7 +45,7 @@ public class FundoProduccionSqlServerAdapter {
                         "predioId", predioId, "anio", anio),
                 "datos", datos == null ? Map.of() : datos));
         try {
-            return jdbc.execute(connection -> {
+            return PaTrace.call(CALL, accion, () -> jdbc.execute(connection -> {
                 CallableStatement statement = connection.prepareCall(CALL);
                 statement.setString(1, accion);
                 statement.setNString(2, payload);
@@ -65,7 +66,7 @@ public class FundoProduccionSqlServerAdapter {
                 String raw = statement.getNString(3);
                 T value = raw == null || raw.isBlank() ? null : mapper.readValue(raw, type);
                 return PersistenceResult.ok(code, message, http == 0 ? 200 : http, value);
-            });
+            }));
         } catch (DataAccessException exception) {
             return PersistenceResult.error("FUNDO_BD_NO_DISPONIBLE",
                     "No se pudo procesar la producción del fundo.", 503);

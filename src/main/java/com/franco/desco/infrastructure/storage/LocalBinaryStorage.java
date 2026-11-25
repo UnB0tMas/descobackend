@@ -166,6 +166,10 @@ public class LocalBinaryStorage {
                             targetId == null
                                     ? "producto"
                                     : "producto-" + targetId;
+                    case "gasto" ->
+                            targetId == null
+                                    ? "gasto"
+                                    : "gasto-" + targetId;
                     default ->
                             "general";
                 };

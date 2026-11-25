@@ -37,7 +37,29 @@ public final class SqlServerPaExecutor {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public PaExecution execute(
+    public PaExecution execute(String procedure, Map<String, ?> inputs) {
+        return PaTrace.call(procedure, requestAction(procedure, inputs),
+                () -> executeInternal(procedure, inputs));
+    }
+
+    private String requestAction(String procedure, Map<String, ?> inputs) {
+        if (inputs != null) {
+            for (Map.Entry<String, ?> entry : inputs.entrySet()) {
+                if (entry.getKey() == null) {
+                    continue;
+                }
+                String key = entry.getKey().replace("@", "")
+                        .replace("_", "").toLowerCase(Locale.ROOT);
+                if (("caccion".equals(key) || "accion".equals(key)
+                        || "action".equals(key)) && entry.getValue() != null) {
+                    return String.valueOf(entry.getValue());
+                }
+            }
+        }
+        return PaTrace.operationName(procedure);
+    }
+
+    private PaExecution executeInternal(
             String procedure,
             Map<String, ?> inputs
     ) {

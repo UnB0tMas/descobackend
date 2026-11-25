@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.sqlserver.uot;
 
+import com.franco.desco.adapter.out.sqlserver.shared.LoggedSimpleJdbcCall;
 import com.franco.desco.application.shared.PersistenceResult;
 import com.franco.desco.application.shared.SessionIdentity;
 import com.franco.desco.application.uot.UotLifecycleCommands;
@@ -72,7 +73,7 @@ public class UotLifecycleSqlServerAdapter implements UotLifecyclePersistencePort
     }
 
     private static String json(java.util.List<Long> ids){return "["+ids.stream().map(String::valueOf).collect(Collectors.joining(","))+"]";}
-    private static SimpleJdbcCall call(DataSource d,String schema,String name,org.springframework.jdbc.core.SqlParameter... p){return new SimpleJdbcCall(d).withSchemaName(schema).withProcedureName(name).withoutProcedureColumnMetaDataAccess().declareParameters(p);}
+    private static SimpleJdbcCall call(DataSource d,String schema,String name,org.springframework.jdbc.core.SqlParameter... p){return new LoggedSimpleJdbcCall(d, schema + "." + name).withSchemaName(schema).withProcedureName(name).withoutProcedureColumnMetaDataAccess().declareParameters(p);}
     private static SqlParameter in(String n,int t){return new SqlParameter(n,t);}
     private static SqlOutParameter outInt(String n){return new SqlOutParameter(n,Types.INTEGER);}
     private static SqlOutParameter commonResult(){return new SqlOutParameter("bResultado",Types.BIT);}

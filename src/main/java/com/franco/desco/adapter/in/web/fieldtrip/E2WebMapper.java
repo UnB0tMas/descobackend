@@ -29,13 +29,13 @@ public final class E2WebMapper {
             safe(x.motivos()).stream().map(this::response).toList(),safe(x.tiposVisita()).stream().map(this::response).toList(),
             safe(x.bienes()).stream().map(this::response).toList(),safe(x.participantes()).stream().map(this::response).toList());}
     private E2WebTypes.Opcion response(E2Models.Option x){return new E2WebTypes.Opcion(x.id(),x.nombre(),x.codigo());}
-    private E2WebTypes.RecursoOpcion response(E2Models.ResourceOption x){return new E2WebTypes.RecursoOpcion(x.id(),x.tipo(),x.nombre(),x.codigo(),x.unidad(),x.disponible());}
+    private E2WebTypes.RecursoOpcion response(E2Models.ResourceOption x){return new E2WebTypes.RecursoOpcion(x.id(),x.tipo(),x.nombre(),x.codigo(),x.unidad(),x.disponible(),x.disponibleTecnico(),x.disponibleComercial());}
     public E2WebTypes.Detalle response(E2Models.Detail x){return new E2WebTypes.Detalle(x.salidaId(),x.nombre(),x.estado(),x.uotId(),x.convenioId(),x.solicitanteEmpleadoId(),x.fechaSolicitud(),x.motivoSalidaId(),x.descripcion(),x.fechaInicioPrevista(),x.fechaFinPrevista(),x.fechaInicioReal(),x.fechaFinReal(),x.fechaAprobacion(),
             safe(x.destinos()).stream().map(d->new E2WebTypes.Destino(d.destinoId(),d.predioId(),d.referencia(),d.orden(),d.actividadPrevista())).toList(),
             safe(x.participantes()).stream().map(p->new E2WebTypes.Participante(p.empleadoId(),p.nombre(),p.funcion(),p.responsable())).toList(),
             safe(x.bienes()).stream().map(b->new E2WebTypes.Bien(b.solicitudRecursoId(),b.bienId(),b.suministroId(),b.tipo(),b.codigo(),b.nombre(),b.unidad(),b.cantidadSolicitada(),b.cantidadDevueltaDeclarada(),b.cantidadDevueltaValidada(),b.estado(),b.resultadoDeclarado(),b.resultadoValidado(),b.observacion(),b.observacionValidacion())).toList(),
             safe(x.visitas()).stream().map(v->new E2WebTypes.Visita(v.visitaId(),v.destinoId(),v.predioId(),v.fechaInicio(),v.fechaFin(),v.estado(),v.objetivo(),v.resumen(),v.recomendaciones(),v.tipoVisita())).toList(),
-            safe(x.historial()).stream().map(h->new E2WebTypes.Evento(h.eventoId(),h.tipo(),h.detalle(),h.usuarioId(),h.fechaHora())).toList(),
+            safe(x.historial()).stream().map(h->new E2WebTypes.Evento(h.eventoId(),h.tipo(),h.detalle(),h.usuarioId(),h.usuarioNombre(),h.fechaHora())).toList(),
             x.observacionRetorno(),x.justificacionSinVisita(),x.observacionInspeccion());}
     private static <T> List<T> safe(List<T> values){return values==null?List.of():values;}
 }

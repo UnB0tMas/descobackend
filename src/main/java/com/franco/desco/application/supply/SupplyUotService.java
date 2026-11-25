@@ -1,5 +1,6 @@
 package com.franco.desco.application.supply;
 
+import com.franco.desco.adapter.out.sqlserver.shared.LoggedSimpleJdbcCall;
 import com.franco.desco.application.shared.AppResult;
 import com.franco.desco.application.shared.AppStatus;
 import com.franco.desco.application.shared.SessionIdentity;
@@ -55,6 +56,7 @@ public class SupplyUotService {
                 in("nUsuarioId", Types.BIGINT),
                 in("nSesionUsuarioId", Types.BIGINT),
                 in("nUotId", Types.BIGINT),
+                in("cBuscar", Types.NVARCHAR),
                 in("nPagina", Types.INTEGER),
                 in("nTamano", Types.INTEGER)
         ).returningResultSet(
@@ -74,6 +76,7 @@ public class SupplyUotService {
                         rs.getBigDecimal("stockDisponible"),
                         rs.getBigDecimal("stockMinimo"),
                         rs.getBoolean("requiereReposicion"),
+                        (Long) rs.getObject("productoId"),
                         rs.getLong("totalRegistros")
                 )
         );
@@ -89,6 +92,7 @@ public class SupplyUotService {
                 in("cUnidad", Types.VARCHAR),
                 in("nStockInicial", Types.DECIMAL),
                 in("nStockMinimo", Types.DECIMAL),
+                in("nProductoId", Types.BIGINT),
                 new SqlOutParameter("nSuministroId", Types.BIGINT)
         );
 
@@ -99,6 +103,7 @@ public class SupplyUotService {
                 in("nSesionUsuarioId", Types.BIGINT),
                 in("nUotId", Types.BIGINT),
                 in("nSuministroId", Types.BIGINT),
+                in("nProductoId", Types.BIGINT),
                 in("cNombre", Types.NVARCHAR),
                 in("cUnidad", Types.VARCHAR),
                 in("nStockMinimo", Types.DECIMAL)
@@ -172,6 +177,7 @@ public class SupplyUotService {
     public AppResult<PageResult<SupplyModels.Summary>> list(
             SessionIdentity identity,
             Long uotId,
+            String search,
             int page,
             int size
     ) {
@@ -184,6 +190,7 @@ public class SupplyUotService {
             Map<String, Object> output = list.execute(
                     parameters
                             .addValue("nUotId", uotId)
+                            .addValue("cBuscar", search == null || search.isBlank() ? null : search.trim())
                             .addValue("nPagina", page)
                             .addValue("nTamano", size)
             );
@@ -226,6 +233,7 @@ public class SupplyUotService {
             SessionIdentity identity,
             Long uotId,
             String code,
+            Long productId,
             String name,
             String unit,
             BigDecimal initial,
@@ -267,6 +275,7 @@ public class SupplyUotService {
                             .addValue("cCodigo", resolvedCode)
                             .addValue("cNombre", name)
                             .addValue("cUnidad", unit)
+                            .addValue("nProductoId", productId)
                             .addValue("nStockInicial", initial)
                             .addValue(
                                     "nStockMinimo",
@@ -292,6 +301,7 @@ public class SupplyUotService {
             SessionIdentity identity,
             Long uotId,
             Long id,
+            Long productId,
             String name,
             String unit,
             BigDecimal minimum
@@ -306,6 +316,7 @@ public class SupplyUotService {
                     parameters
                             .addValue("nUotId", uotId)
                             .addValue("nSuministroId", id)
+                            .addValue("nProductoId", productId)
                             .addValue("cNombre", name)
                             .addValue("cUnidad", unit)
                             .addValue("nStockMinimo", minimum)
@@ -424,19 +435,19 @@ public class SupplyUotService {
         }
     }
 
-    public AppResult<Long> create(SessionIdentity actor, Long uotId, String code, String name,
+    public AppResult<Long> create(SessionIdentity actor, Long uotId, String code, Long productId, String name,
             String unit, BigDecimal initial, BigDecimal minimum, UUID key) {
         return ApplicationResults.created(idempotency.executeLong(actor.usuarioId(),key,"SUMINISTRO_CREAR",
-                "logistica","Suministro",hash(uotId,code,name,unit,initial,minimum),
-                () -> persistence(createOnce(actor,uotId,code,name,unit,initial,minimum))),
+                "logistica","Suministro",hash(uotId,code,productId,name,unit,initial,minimum),
+                () -> persistence(createOnce(actor,uotId,code,productId,name,unit,initial,minimum))),
                 "SUMINISTRO_CREADO","SUMINISTRO_NO_CREADO");
     }
 
-    public AppResult<Void> update(SessionIdentity actor, Long uotId, Long id, String name,
+    public AppResult<Void> update(SessionIdentity actor, Long uotId, Long id, Long productId, String name,
             String unit, BigDecimal minimum, UUID key) {
         return ApplicationResults.ok(idempotency.executeVoid(actor.usuarioId(),key,"SUMINISTRO_EDITAR",
-                "logistica","Suministro",hash(uotId,id,name,unit,minimum),
-                () -> persistence(updateOnce(actor,uotId,id,name,unit,minimum))),
+                "logistica","Suministro",hash(uotId,id,productId,name,unit,minimum),
+                () -> persistence(updateOnce(actor,uotId,id,productId,name,unit,minimum))),
                 "SUMINISTRO_ACTUALIZADO","SUMINISTRO_NO_ACTUALIZADO",AppStatus.BAD_REQUEST);
     }
 
@@ -488,7 +499,7 @@ public class SupplyUotService {
         all[parameters.length + 2] = new SqlOutParameter("cCodigoRespuesta", Types.VARCHAR);
         all[parameters.length + 3] = new SqlOutParameter("nHttpRespuesta", Types.SMALLINT);
 
-        return new SimpleJdbcCall(dataSource)
+        return new LoggedSimpleJdbcCall(dataSource, "logistica" + "." + name)
                 .withSchemaName("logistica")
                 .withProcedureName(name)
                 .withoutProcedureColumnMetaDataAccess()

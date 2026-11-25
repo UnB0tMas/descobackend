@@ -24,7 +24,7 @@ public class SaleWebMapper {
     public SaleResponses.Payment response(SaleModels.Payment value) {
         return new SaleResponses.Payment(
                 value.paymentId(), value.paymentMethodId(), value.paymentMethod(), value.amount(), value.currency(),
-                value.operationNumber(), value.dateTime(), value.userId(), value.status()
+                value.operationNumber(), value.dateTime(), value.userId(), value.status(), value.archivoId()
         );
     }
 

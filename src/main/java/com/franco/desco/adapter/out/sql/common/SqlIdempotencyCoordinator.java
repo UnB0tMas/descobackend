@@ -1,6 +1,7 @@
 package com.franco.desco.adapter.out.sql.common;
 
 import com.franco.desco.application.shared.PersistenceResult;
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -338,10 +339,11 @@ public final class SqlIdempotencyCoordinator {
                 + ':'
                 + idempotencyKey;
 
-        Integer result = jdbc.queryForObject(
-                LOCK_SQL,
-                Integer.class,
-                resource
+        Integer result = PaTrace.call(
+                "sys.sp_getapplock",
+                () -> jdbc.queryForObject(LOCK_SQL, Integer.class, resource),
+                value -> value != null && value >= 0,
+                value -> "codigoSQLServer=" + value
         );
 
         if (result == null || result < 0) {
@@ -358,13 +360,20 @@ public final class SqlIdempotencyCoordinator {
             String scope,
             String requestHash
     ) {
-        return jdbc.queryForObject(
-                RESERVE_SQL,
-                (resultSet, rowNum) -> reservation(resultSet),
-                userId,
-                idempotencyKey.toString(),
-                scope,
-                requestHash
+        return PaTrace.call(
+                "auditoria.PA_OperacionIdempotente_Ins_Iniciar",
+                () -> jdbc.queryForObject(
+                        RESERVE_SQL,
+                        (resultSet, rowNum) -> reservation(resultSet),
+                        userId,
+                        idempotencyKey.toString(),
+                        scope,
+                        requestHash
+                ),
+                value -> value != null && value.accepted(),
+                value -> value == null
+                        ? "El PA no devolvió la reserva esperada."
+                        : "codigo=" + value.responseCode() + " mensaje=" + value.message()
         );
     }
 
@@ -461,17 +470,24 @@ public final class SqlIdempotencyCoordinator {
             );
         }
 
-        Completion completion = jdbc.queryForObject(
-                COMPLETE_SQL,
-                (resultSet, rowNum) -> new Completion(
-                        resultSet.getBoolean("resultado"),
-                        trim(resultSet.getString("mensaje"))
+        Completion completion = PaTrace.call(
+                "auditoria.PA_OperacionIdempotente_Upd_Finalizar",
+                () -> jdbc.queryForObject(
+                        COMPLETE_SQL,
+                        (resultSet, rowNum) -> new Completion(
+                                resultSet.getBoolean("resultado"),
+                                trim(resultSet.getString("mensaje"))
+                        ),
+                        operationId,
+                        normalize(entitySchema),
+                        normalize(entityName),
+                        normalize(identifier),
+                        limit(normalize(resultCode), 40)
                 ),
-                operationId,
-                normalize(entitySchema),
-                normalize(entityName),
-                normalize(identifier),
-                limit(normalize(resultCode), 40)
+                value -> value != null && value.success(),
+                value -> value == null
+                        ? "El PA no devolvió un resultado."
+                        : value.message()
         );
 
         if (completion == null || !completion.success()) {
@@ -492,16 +508,21 @@ public final class SqlIdempotencyCoordinator {
         }
 
         try {
-            jdbc.queryForObject(
-                    FAIL_SQL,
-                    (resultSet, rowNum) -> resultSet.getBoolean("resultado"),
-                    operationId,
-                    limit(
-                            hasText(message)
-                                    ? message.trim()
-                                    : "La acción no se completó.",
-                            300
-                    )
+            PaTrace.call(
+                    "auditoria.PA_OperacionIdempotente_Upd_MensajeFallido",
+                    () -> jdbc.queryForObject(
+                            FAIL_SQL,
+                            (resultSet, rowNum) -> resultSet.getBoolean("resultado"),
+                            operationId,
+                            limit(
+                                    hasText(message)
+                                            ? message.trim()
+                                            : "La acción no se completó.",
+                                    300
+                            )
+                    ),
+                    Boolean.TRUE::equals,
+                    value -> "bResultado=" + value
             );
         } catch (RuntimeException exception) {
             log.warn(

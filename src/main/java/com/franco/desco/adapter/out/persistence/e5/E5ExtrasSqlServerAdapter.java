@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.persistence.e5;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.shared.PersistenceResult;
 import com.franco.desco.application.shared.RequestMetadata;
 import com.franco.desco.application.shared.SessionIdentity;
@@ -55,7 +56,7 @@ public class E5ExtrasSqlServerAdapter {
                               "liquidacionId",liquidacionId==null?0:liquidacionId),
             "datos",datos==null?Map.of():datos));
         try {
-            return jdbc.execute(connection->{
+            return PaTrace.call(call, () -> jdbc.execute(connection->{
                 CallableStatement stmt=connection.prepareCall(call);
                 stmt.setNString(1,payload);
                 stmt.registerOutParameter(2,Types.LONGNVARCHAR);
@@ -72,7 +73,7 @@ public class E5ExtrasSqlServerAdapter {
                 String raw=stmt.getNString(2);
                 T result=raw==null||raw.isBlank()?null:json.readValue(raw,type);
                 return PersistenceResult.ok(stmt.getString(5),stmt.getNString(4),status==0?200:status,result);
-            });
+            }));
         } catch(DataAccessException ex) {
             return PersistenceResult.error("E5_EXTRAS_BD","No fue posible completar la operación financiera.",503);
         }

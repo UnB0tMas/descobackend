@@ -6,6 +6,7 @@ import com.franco.desco.application.access.service.RoleApplicationService;
 import com.franco.desco.application.account.port.in.AccountUseCase;
 import com.franco.desco.application.account.port.out.AccountPersistencePort;
 import com.franco.desco.application.account.service.AccountApplicationService;
+import com.franco.desco.application.shared.service.EmailValidationService;
 import com.franco.desco.application.auth.port.in.AuthUseCase;
 import com.franco.desco.application.auth.port.out.*;
 import com.franco.desco.application.auth.service.AuthApplicationService;
@@ -142,8 +143,8 @@ public class ApplicationBeanConfig {
     }
 
     @Bean
-    OrganizationUseCase organizationUseCase(OrganizationPersistencePort persistence) {
-        return new OrganizationApplicationService(persistence);
+    OrganizationUseCase organizationUseCase(OrganizationPersistencePort persistence, EmailValidationService emailValidation) {
+        return new OrganizationApplicationService(persistence, emailValidation);
     }
 
     @Bean
@@ -157,16 +158,17 @@ public class ApplicationBeanConfig {
     }
 
     @Bean
-    EmployeeUseCase employeeUseCase(EmployeePersistencePort persistence) {
-        return new EmployeeApplicationService(persistence);
+    EmployeeUseCase employeeUseCase(EmployeePersistencePort persistence, EmailValidationService emailValidation) {
+        return new EmployeeApplicationService(persistence, emailValidation);
     }
 
     @Bean
     UserAdminUseCase userAdminUseCase(
             UserAdminPersistencePort persistence,
-            PasswordHashPort passwordHashPort
+            PasswordHashPort passwordHashPort,
+            EmailValidationService emailValidation
     ) {
-        return new UserAdminApplicationService(persistence, passwordHashPort);
+        return new UserAdminApplicationService(persistence, passwordHashPort, emailValidation);
     }
 
     @Bean
@@ -179,7 +181,8 @@ public class ApplicationBeanConfig {
             SecurityMailPort securityMailPort,
             @Qualifier("authSqlServerAdapter")
             SecurityNotificationPort securityNotificationPort,
-            SmtpMode smtpMode
+            SmtpMode smtpMode,
+            EmailValidationService emailValidation
     ) {
         return new AccountApplicationService(
                 persistence,
@@ -187,7 +190,8 @@ public class ApplicationBeanConfig {
                 otpPort,
                 securityMailPort,
                 securityNotificationPort,
-                smtpMode.enabled()
+                smtpMode.enabled(),
+                emailValidation
         );
     }
 
@@ -197,8 +201,8 @@ public class ApplicationBeanConfig {
     }
 
     @Bean
-    ProducerUseCase producerUseCase(ProducerPersistencePort persistence) {
-        return new ProducerApplicationService(persistence);
+    ProducerUseCase producerUseCase(ProducerPersistencePort persistence, EmailValidationService emailValidation) {
+        return new ProducerApplicationService(persistence, emailValidation);
     }
 
     @Bean

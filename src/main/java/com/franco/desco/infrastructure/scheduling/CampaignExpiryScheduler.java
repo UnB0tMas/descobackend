@@ -1,5 +1,6 @@
 package com.franco.desco.infrastructure.scheduling;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,7 +24,7 @@ public final class CampaignExpiryScheduler {
     public void expire() {
         if (!running.compareAndSet(false, true)) return;
         try {
-            Integer affected = jdbc.queryForObject("EXEC comercial.PA_CampaniaVenta_Upd_Vencer", Integer.class);
+            Integer affected = PaTrace.call("comercial.PA_CampaniaVenta_Upd_Vencer", () -> jdbc.queryForObject("EXEC comercial.PA_CampaniaVenta_Upd_Vencer", Integer.class));
             if (affected != null && affected > 0) {
                 log.info("[CAMPANIAS] Campañas vencidas={}", affected);
             }

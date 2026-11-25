@@ -1,5 +1,6 @@
 package com.franco.desco.application.resource.service;
 
+import com.franco.desco.adapter.out.sqlserver.shared.LoggedSimpleJdbcCall;
 import com.franco.desco.application.resource.ResourceCommands;
 import com.franco.desco.application.resource.port.in.ResourceUseCase;
 import com.franco.desco.application.shared.AppResult;
@@ -13,6 +14,8 @@ import org.springframework.jdbc.core.SqlParameter;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
@@ -27,6 +30,7 @@ import java.util.UUID;
 public class ResourceExperienceService {
 
     private static final int SQL_SERVER_GUID = -145;
+    private static final Logger LOG = LoggerFactory.getLogger(ResourceExperienceService.class);
 
     private final ResourceUseCase resources;
     private final JdbcTemplate jdbc;
@@ -74,7 +78,7 @@ public class ResourceExperienceService {
                 new SqlOutParameter("nUbicacionId", Types.BIGINT)
         );
 
-        this.createCatalogProduct = new SimpleJdbcCall(dataSource)
+        this.createCatalogProduct = new LoggedSimpleJdbcCall(dataSource, "logistica" + "." + "PA_Producto_Ins_Catalogo")
                 .withSchemaName("logistica")
                 .withProcedureName("PA_Producto_Ins_Catalogo")
                 .withoutProcedureColumnMetaDataAccess()
@@ -204,6 +208,8 @@ public class ResourceExperienceService {
                     new ResourceModels.CodeSuggestion(uotId, normalizedType, code)
             );
         } catch (DataAccessException exception) {
+            LOG.error(">> [PA ERROR SQL/TECNICO] procedimiento=logistica.PA_Recurso_Sel_CodigoSugerido accion=CONSULTAR tipo={} uotId={}",
+                    normalizedType, uotId, exception);
             return unavailable();
         }
     }
@@ -236,6 +242,7 @@ public class ResourceExperienceService {
                 command.providerPersonId(),
                 command.providerCompanyId(),
                 command.observation(),
+                command.technicalUse(),
                 command.vehicle(),
                 command.idempotencyKey()
         );
@@ -304,6 +311,8 @@ public class ResourceExperienceService {
                     ? AppResult.created(code, message, productId)
                     : AppResult.ok(code, message, productId);
         } catch (DataAccessException exception) {
+            LOG.error(">> [PA ERROR SQL/TECNICO] procedimiento=logistica.PA_Producto_Ins_Catalogo accion=REGISTRAR uotId={}",
+                    command.contextUotId(), exception);
             return unavailable();
         }
     }
@@ -662,7 +671,7 @@ public class ResourceExperienceService {
         all[parameters.length + 2] = new SqlOutParameter("cCodigoRespuesta", Types.VARCHAR);
         all[parameters.length + 3] = new SqlOutParameter("nHttpRespuesta", Types.SMALLINT);
 
-        return new SimpleJdbcCall(dataSource)
+        return new LoggedSimpleJdbcCall(dataSource, schema + "." + procedure)
                 .withSchemaName(schema)
                 .withProcedureName(procedure)
                 .withoutProcedureColumnMetaDataAccess()

@@ -13,7 +13,7 @@ public class ResourceWebMapper {
                 value.brand(), value.model(), value.serial(), value.state(), value.acquisitionDate(),
                 value.acquisitionAmount(), value.acquisitionCurrency(), value.providerPersonId(),
                 value.providerCompanyId(), value.observation(), value.mainImageFileId(),
-                value.openIncidents(), value.active()
+                value.openIncidents(), value.active(), value.technicalUse()
         );
     }
 
@@ -25,7 +25,7 @@ public class ResourceWebMapper {
                 value.acquisitionDate(), value.acquisitionAmount(), value.acquisitionCurrency(),
                 value.providerPersonId(), value.providerCompanyId(), value.providerName(), value.observation(),
                 value.plate(), value.vehicleType(), value.mileageKm(), value.color(), value.mainImageFileId(),
-                contentUrl(value.mainImageFileId()), value.openIncidents(), value.active()
+                contentUrl(value.mainImageFileId()), value.openIncidents(), value.active(), value.technicalUse()
         );
     }
 

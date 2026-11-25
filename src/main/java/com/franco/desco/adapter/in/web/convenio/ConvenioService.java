@@ -186,7 +186,7 @@ public class ConvenioService {
         List<ConvenioModuloUsuarioResponse> users = jdbc.query(
                 """
                 SELECT DISTINCT U.usuario_id,U.nombre_usuario,
-                       CONCAT(P.nombres, ' ', P.apellido_paterno, ' ', ISNULL(P.apellido_materno,''))
+                       CONCAT(P.nombres, ' ', P.apellido_paterno, ' ', ISNULL(P.apellido_materno,'')) AS empleado
                 FROM seg.UsuarioUOT UU
                 JOIN seg.Usuario U ON U.usuario_id=UU.usuario_id AND U.estado=1
                 JOIN org.Persona P ON P.persona_id=U.persona_id AND P.estado=1
@@ -200,7 +200,7 @@ public class ConvenioService {
                         AND EU.estado=1 AND EU.fecha_desde<=CONVERT(date,SYSUTCDATETIME())
                         AND (EU.fecha_hasta IS NULL OR EU.fecha_hasta>=CONVERT(date,SYSUTCDATETIME()))
                   )
-                ORDER BY P.nombres,P.apellido_paterno,U.usuario_id
+                ORDER BY empleado,U.usuario_id
                 """, (rs, i) -> new ConvenioModuloUsuarioResponse(
                         rs.getLong(1),rs.getString(2),rs.getString(3),List.of()),uotId);
         List<ConvenioModuloUsuarioResponse> output = users.stream().map(u ->

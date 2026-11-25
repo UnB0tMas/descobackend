@@ -1,5 +1,6 @@
 package com.franco.desco.application.fieldtrip.document;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.localdocument.LocalDocumentService;
 import com.franco.desco.application.shared.AppResult;
 import com.franco.desco.application.shared.AppStatus;
@@ -46,13 +47,13 @@ public final class E2DocumentService {
         if(identity==null||identity.usuarioId()==null)
             return AppResult.error(AppStatus.UNAUTHORIZED,"E2_DOC_SESION","Sesión no disponible.");
         try {
-            List<Documento> docs=jdbc.query(
+            List<Documento> docs=PaTrace.call("campo.PA_SalidaDocumento_Sel_Listado", () -> jdbc.query(
                 "EXEC campo.PA_SalidaDocumento_Sel_Listado ?,?,?,?",
                 (rs,n)->new Documento(rs.getLong("archivoId"),rs.getLong("salidaId"),
                   rs.getString("salidaNombre"),rs.getString("nombreOriginal"),
                   rs.getString("mimeType"),rs.getString("tipo"),
                   rs.getTimestamp("fechaCarga").toLocalDateTime().toInstant(java.time.ZoneOffset.UTC),rs.getLong("tamanoBytes")),
-                identity.usuarioId(),uot,salida,soloPropios);
+                identity.usuarioId(),uot,salida,soloPropios));
             return AppResult.ok("E2_DOCUMENTOS_LISTADOS","Documentos consultados.",docs);
         }catch(DataAccessException ex){
             return AppResult.error(AppStatus.SERVICE_UNAVAILABLE,"E2_DOC_LISTA_ERROR",
@@ -72,12 +73,12 @@ public final class E2DocumentService {
                 """,Integer.class,identity.usuarioId(),salida,uot,identity.usuarioId());
             if(allowed==null||allowed==0)
                 return AppResult.error(AppStatus.FORBIDDEN,"E2_DOC_NO_AUTORIZADO","Solo el responsable puede generar el documento de su solicitud confirmada.");
-            String json=jdbc.queryForObject("EXEC campo.PA_SalidaDocumento_Sel_Datos ?,?,?",
-                    String.class,identity.usuarioId(),uot,salida);
+            String json=PaTrace.call("campo.PA_SalidaDocumento_Sel_Datos", () -> jdbc.queryForObject("EXEC campo.PA_SalidaDocumento_Sel_Datos ?,?,?",
+                    String.class,identity.usuarioId(),uot,salida));
             if(json==null||json.isBlank())
                 return AppResult.error(AppStatus.NOT_FOUND,"E2_DOC_NO_DISPONIBLE","Solicitud no disponible.");
             JsonNode data=mapper.readTree(json);
-            String version=data.path("fechaSolicitud").asText();
+            String version=data.path("fechaSolicitud").asString();
             String nombre="Solicitud_salida_"+salida+"_"+version.replaceAll("[^0-9]","")+".docx";
             UUID key=UUID.nameUUIDFromBytes(("DESCO:E2:WORD:"+identity.usuarioId()+":"+salida+":"+version)
                     .getBytes(StandardCharsets.UTF_8));
@@ -122,8 +123,8 @@ public final class E2DocumentService {
     }
 
     private AppResult<Documento> clasificar(SessionIdentity user,Long uot,Long salida,Long archivo,String tipo) {
-        jdbc.update("EXEC campo.PA_SalidaDocumento_Upd_Clasificar ?,?,?,?,?",
-                user.usuarioId(),uot,salida,archivo,tipo);
+        PaTrace.call("campo.PA_SalidaDocumento_Upd_Clasificar", () -> jdbc.update("EXEC campo.PA_SalidaDocumento_Upd_Clasificar ?,?,?,?,?",
+                user.usuarioId(),uot,salida,archivo,tipo));
         var found=listar(uot,salida,user,true);
         if(!found.exitoso()||found.datos()==null)
             return AppResult.error(AppStatus.SERVICE_UNAVAILABLE,"E2_DOC_VERIFICACION",
@@ -139,29 +140,29 @@ public final class E2DocumentService {
             XWPFParagraph title=word.createParagraph(); title.setAlignment(ParagraphAlignment.CENTER);
             XWPFRun t=title.createRun();t.setBold(true);t.setFontSize(16);t.setText("SOLICITUD DE SALIDA DE CAMPO");
             XWPFParagraph codigo=word.createParagraph();codigo.setAlignment(ParagraphAlignment.CENTER);
-            codigo.createRun().setText("N.° "+d.path("salidaId").asText()+"  |  "+d.path("uot").asText());
-            paragraph(word,"Fecha de solicitud: "+format(d.path("fechaSolicitud").asText()));
-            paragraph(word,"Asunto: "+d.path("nombre").asText());
-            paragraph(word,"Motivo: "+d.path("motivo").asText());
-            String solicitante=d.path("solicitante").asText();
+            codigo.createRun().setText("N.° "+d.path("salidaId").asString()+"  |  "+d.path("uot").asString());
+            paragraph(word,"Fecha de solicitud: "+format(d.path("fechaSolicitud").asString()));
+            paragraph(word,"Asunto: "+d.path("nombre").asString());
+            paragraph(word,"Motivo: "+d.path("motivo").asString());
+            String solicitante=d.path("solicitante").asString();
             paragraph(word,"Por medio del presente, "+solicitante+", en calidad de responsable de la salida, "
                 +"solicita autorización para realizar actividades técnicas de campo, de conformidad "
                 +"con la programación y los recursos detallados en este documento.");
-            paragraph(word,"Inicio previsto: "+format(d.path("inicio").asText())
-                +"       Fin previsto: "+format(d.path("fin").asText()));
-            if(!d.path("descripcion").asText().isBlank())paragraph(word,"Descripción: "+d.path("descripcion").asText());
+            paragraph(word,"Inicio previsto: "+format(d.path("inicio").asString())
+                +"       Fin previsto: "+format(d.path("fin").asString()));
+            if(!d.path("descripcion").asString().isBlank())paragraph(word,"Descripción: "+d.path("descripcion").asString());
             heading(word,"Destinos y actividades previstas");
             var destinos=d.path("destinos");
             XWPFTable destinosTabla=word.createTable();writeRow(destinosTabla.getRow(0),"Fundo / predio","Actividad prevista");
-            for(JsonNode x:destinos)writeRow(destinosTabla.createRow(),x.path("predio").asText(),x.path("actividad").asText());
+            for(JsonNode x:destinos)writeRow(destinosTabla.createRow(),x.path("predio").asString(),x.path("actividad").asString());
             heading(word,"Participantes");
             XWPFTable participantes=word.createTable();writeRow(participantes.getRow(0),"Nombres y apellidos","Función");
-            for(JsonNode x:d.path("participantes"))writeRow(participantes.createRow(),x.path("nombre").asText(),
-                x.path("responsable").asBoolean()?"Responsable":x.path("funcion").asText("Técnico"));
+            for(JsonNode x:d.path("participantes"))writeRow(participantes.createRow(),x.path("nombre").asString(),
+                x.path("responsable").asBoolean()?"Responsable":x.path("funcion").asString("Técnico"));
             heading(word,"Recursos y vehículos solicitados");
             XWPFTable bienes=word.createTable();writeRow(bienes.getRow(0),"Recurso","Tipo","Cantidad");
-            for(JsonNode x:d.path("recursos"))writeRow(bienes.createRow(),x.path("nombre").asText(),
-                x.path("tipo").asText(),x.path("cantidad").asText()+" "+x.path("unidad").asText());
+            for(JsonNode x:d.path("recursos"))writeRow(bienes.createRow(),x.path("nombre").asString(),
+                x.path("tipo").asString(),x.path("cantidad").asString()+" "+x.path("unidad").asString());
             paragraph(word,"La salida se ejecutará exclusivamente después de la aprobación correspondiente "
                 +"y de la entrega física de los recursos autorizados. Al retornar se declarará su estado "
                 +"y se cumplirá el procedimiento de inspección y cierre.");

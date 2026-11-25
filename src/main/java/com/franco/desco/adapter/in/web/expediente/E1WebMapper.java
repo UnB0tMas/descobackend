@@ -9,6 +9,7 @@ public final class E1WebMapper {
 
     public E1Commands.Persona persona(E1WebTypes.PersonaRequest request) {
         return new E1Commands.Persona(
+                request.personaId(),
                 request.tipoDocumento(),
                 request.numeroDocumento(),
                 request.nombres(),

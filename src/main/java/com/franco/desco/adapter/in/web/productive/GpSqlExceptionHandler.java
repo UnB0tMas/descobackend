@@ -16,7 +16,7 @@ import java.util.Set;
 import java.time.Instant;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes={GpController.class,GpFotoController.class})
+@RestControllerAdvice(assignableTypes={GpController.class,GpFotoController.class,GpProductorController.class})
 public class GpSqlExceptionHandler {
   // Únicamente textos literales de THROW 51103 controlados por el proyecto GP.
   // No publicar mensajes de errores SQL Server no clasificados.

@@ -3,6 +3,8 @@ package com.franco.desco.application.expediente.service;
 import com.franco.desco.application.expediente.E1Commands;
 import com.franco.desco.application.expediente.port.out.E1PersistencePort;
 import com.franco.desco.application.shared.*;
+import com.franco.desco.application.shared.service.EmailValidationService;
+import com.franco.desco.application.shared.port.out.EmailValidationPort;
 import com.franco.desco.domain.expediente.E1Models;
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +17,8 @@ import static org.mockito.Mockito.*;
 
 class E1ApplicationServiceTest {
     private final E1PersistencePort persistence = mock(E1PersistencePort.class);
-    private final E1ApplicationService service = new E1ApplicationService(persistence);
+    private final E1ApplicationService service = new E1ApplicationService(
+            persistence, new EmailValidationService(email -> EmailValidationPort.Result.VALID, false));
     private final SessionIdentity identity = new SessionIdentity(10L, UUID.randomUUID(), 1, "test");
     private final RequestMetadata metadata = new RequestMetadata(
             UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "127.0.0.1",
@@ -89,6 +92,41 @@ class E1ApplicationServiceTest {
         assertThat(result.exitoso()).isFalse();
         assertThat(result.codigo()).isEqualTo("BUSQUEDA_INVALIDA");
         verifyNoInteractions(persistence);
+    }
+
+    @Test
+    void permiteConsultarPadronTecnicoSinTerminoDeBusqueda() {
+        when(persistence.searchPersonas(any(), any(), any()))
+                .thenReturn(PersistenceResult.ok("EXPEDIENTE_OK", "Consulta correcta", 200,
+                        new E1Models.Personas(List.of())));
+        var result = service.searchPersonas(new E1Commands.SearchPersonas(2L, ""), identity, metadata);
+        assertThat(result.exitoso()).isTrue();
+        verify(persistence).searchPersonas(any(), any(), any());
+    }
+
+    @Test
+    void creaFundoSinCamposAgricolasOpcionales() {
+        var predio = new E1Commands.Predio(66L, "El Palto", "050801", null,
+                new java.math.BigDecimal("-14.040610"), new java.math.BigDecimal("-75.774498"),
+                null, new java.math.BigDecimal("10"), null, null, null, null,
+                null, null, null, null, "PROPIETARIO", List.of());
+        when(persistence.createPredio(any(), any(), any())).thenReturn(
+                PersistenceResult.ok("EXPEDIENTE_OK", "Registrado", 200, new E1Models.Identificador(12L)));
+        var result = service.createPredio(new E1Commands.CreatePredio(2L, null, predio), identity, metadata);
+        assertThat(result.exitoso()).isTrue();
+        verify(persistence).createPredio(any(), any(), any());
+    }
+
+    @Test
+    void bloqueaSuperficieTotalInvalida() {
+        var predio = new E1Commands.Predio(66L, "El Palto", "050801", null,
+                new java.math.BigDecimal("-14.040610"), new java.math.BigDecimal("-75.774498"),
+                null, java.math.BigDecimal.ZERO, null, null, null, null,
+                null, null, null, null, "PROPIETARIO", List.of());
+        var result = service.createPredio(new E1Commands.CreatePredio(2L, null, predio), identity, metadata);
+        assertThat(result.exitoso()).isFalse();
+        assertThat(result.codigo()).isEqualTo("PREDIO_INCOMPLETO");
+        verify(persistence, never()).createPredio(any(), any(), any());
     }
 
     @Test

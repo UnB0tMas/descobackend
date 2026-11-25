@@ -1,5 +1,6 @@
 package com.franco.desco.adapter.out.persistence.e4;
 
+import com.franco.desco.adapter.out.sqlserver.shared.PaTrace;
 import com.franco.desco.application.e4.E4Commands.Execute;
 import com.franco.desco.application.e4.port.out.E4PersistencePort;
 import com.franco.desco.application.shared.PersistenceResult;
@@ -55,7 +56,7 @@ public final class E4SqlServerAdapter implements E4PersistencePort {
                 "contexto", contexto, "filtros", filtros,
                 "datos", command.datos() == null ? Map.of() : command.datos()));
         try {
-            return jdbc.execute(connection -> {
+            return PaTrace.call(CALL, command.accion(), () -> jdbc.execute(connection -> {
                 CallableStatement stmt = connection.prepareCall(CALL);
                 stmt.setString(1, command.accion());
                 stmt.setNString(2, payload);
@@ -76,7 +77,7 @@ public final class E4SqlServerAdapter implements E4PersistencePort {
                 String raw = stmt.getNString(3);
                 T value = raw == null || raw.isBlank() ? null : json.readValue(raw, type);
                 return PersistenceResult.ok(code, message, http == 0 ? 200 : http, value);
-            });
+            }));
         } catch (DataAccessException exception) {
             return PersistenceResult.error("E4_BD_NO_DISPONIBLE",
                     "No se pudo completar la operación comercial en este momento.", 503);

@@ -34,7 +34,8 @@ public final class ResourceResponses {
             String observacion,
             Long archivoPrincipalId,
             int incidentesAbiertos,
-            boolean estado
+            boolean estado,
+            boolean permiteSalidaTecnica
     ) {
     }
 
@@ -67,7 +68,8 @@ public final class ResourceResponses {
             Long archivoPrincipalId,
             String imagenPrincipalUrl,
             int incidentesAbiertos,
-            boolean estado
+            boolean estado,
+            boolean permiteSalidaTecnica
     ) {
     }
 
